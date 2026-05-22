@@ -320,7 +320,7 @@ const ColoredIcon = ({ icon: Icon, size, color }: any) => {
 // MAIN COMPONENT
 // ============================================================
 
-export default function AdminJadwalScreen() {
+export default function AdminJadwalScreen({ isEmbedded = false }: { isEmbedded?: boolean }) {
   const navigation = useNavigation<any>();
   const { tokens, isLightTheme } = useTheme();
 
@@ -952,24 +952,26 @@ Wassalamu’alaikum Warahmatullahi Wabarakatuh.`;
           contentContainerStyle={{ paddingBottom: 40 }}
         >
           {/* HEADER */}
-          <View style={styles.headerContainer}>
-            <View style={styles.header}>
-              <TouchableOpacity
-                onPress={() => navigation.goBack()}
-                style={styles.backButton}
-                activeOpacity={0.7}
-              >
-                <LinearGradient
-                  colors={['rgba(59, 130, 246, 0.2)', 'rgba(59, 130, 246, 0.1)']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.backButtonGradient}
+          {!isEmbedded && (
+            <View style={styles.headerContainer}>
+              <View style={styles.header}>
+                <TouchableOpacity
+                  onPress={() => navigation.goBack()}
+                  style={styles.backButton}
+                  activeOpacity={0.7}
                 >
-                  <ChevronLeft color={tokens.textColor} size={24} />
-                </LinearGradient>
-              </TouchableOpacity>
+                  <LinearGradient
+                    colors={['rgba(59, 130, 246, 0.2)', 'rgba(59, 130, 246, 0.1)']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.backButtonGradient}
+                  >
+                    <ChevronLeft color={tokens.textColor} size={24} />
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
+          )}
 
           {/* Day Selector */}
           <View style={{ paddingHorizontal: 16, marginBottom: 20 }}>

@@ -26,6 +26,8 @@ export const getStatusConfig = (status: string) => {
     case 'SPOOF_ATTEMPT':
     case 'SPOOF_DETECTED':
       return { color: '#E11D48', text: 'Spoof Terdeteksi', icon: ShieldAlert };
+    case 'OUT_OF_ZONE':
+      return { color: '#8B5CF6', text: 'Tidak Terdeteksi', icon: ShieldAlert };
     case 'RESOLVED':
       return { color: '#059669', text: 'Selesai', icon: CheckCircle };
     default: 

@@ -35,11 +35,13 @@ import { BlurView } from 'expo-blur';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { useTheme } from '../context/ThemeContext';
 import { API_URL } from '@/constants/Config';
 import AnimatedBackground from '../components/ui/AnimatedBackground';
 import { io } from 'socket.io-client';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { useAuth } from '../context/AuthContext';
 
 const { width, height } = Dimensions.get('window');
 
@@ -61,6 +63,7 @@ export default function AdminFaceRegistrationScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { tokens, isLightTheme } = useTheme();
+  const { logout } = useAuth();
 
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
@@ -91,6 +94,12 @@ export default function AdminFaceRegistrationScreen() {
       });
       const json = await response.json();
       console.log('Fetched Students JSON:', json);
+      if (response.status === 401) {
+        Alert.alert('Sesi Berakhir', 'Sesi Anda telah berakhir. Silakan login kembali.', [
+          { text: 'OK', onPress: logout }
+        ]);
+        return;
+      }
       if (json.success) {
         setStudents(json.data);
       } else {
@@ -141,17 +150,42 @@ export default function AdminFaceRegistrationScreen() {
   }, [selectedStudent]);
 
   // ── Image Handling ───────────────────────────────────────
+  
+  const processImage = async (uri: string): Promise<string | null> => {
+    try {
+      // Scale down image drastically to maximum 800px width/height and heavy compression.
+      // This prevents backend canvas parsing/RAM Out Of Memory errors and network payload bloat.
+      const manipResult = await ImageManipulator.manipulateAsync(
+        uri,
+        [{ resize: { width: 600 } }], // Scaling proportional to width 600
+        { compress: 0.5, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+      );
+      return `data:image/jpeg;base64,${manipResult.base64}`;
+    } catch (e) {
+      console.error('Manipulate error:', e);
+      return null;
+    }
+  };
+
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsMultipleSelection: true,
-      quality: 0.5,
-      base64: true,
+      quality: 0.5, 
     });
 
     if (!result.canceled) {
-      const newImages = result.assets.map(asset => `data:image/jpeg;base64,${asset.base64}`);
-      setCapturedImages([...capturedImages, ...newImages]);
+      setIsProcessing(true);
+      setProgressMessage('Menyiapkan ukuran gambar...');
+      
+      const compressed: string[] = [];
+      for (const asset of result.assets) {
+        const b64 = await processImage(asset.uri);
+        if (b64) compressed.push(b64);
+      }
+      
+      setCapturedImages(prev => [...prev, ...compressed]);
+      setIsProcessing(false);
     }
   };
 
@@ -170,16 +204,17 @@ export default function AdminFaceRegistrationScreen() {
     if (cameraRef.current) {
       try {
         const photo = await cameraRef.current.takePictureAsync({
-          quality: 0.5,
-          base64: true,
+          quality: 0.5, // Native quality, we compress later to control dimension.
           exif: false,
         });
         
-        if (photo && photo.base64) {
-          setCapturedImages([...capturedImages, `data:image/jpeg;base64,${photo.base64}`]);
-          // Optional: stay in camera if they need more photos, or close
-          if (capturedImages.length >= 4) {
-            setIsCameraActive(false);
+        if (photo && photo.uri) {
+          const b64 = await processImage(photo.uri);
+          if (b64) {
+            setCapturedImages(prev => [...prev, b64]);
+            if (capturedImages.length >= 4) {
+              setIsCameraActive(false);
+            }
           }
         }
       } catch (error) {
@@ -220,7 +255,15 @@ export default function AdminFaceRegistrationScreen() {
         }),
       });
 
-      const json = await response.json();
+      let json;
+      try {
+        const textResponse = await response.text();
+        console.log("RAW SERVER RESPONSE:", textResponse); // We will see this in the logs! 
+        json = JSON.parse(textResponse);
+      } catch (jsonError: any) {
+        throw new Error(`Server Response Error: ${jsonError.message}. Response was not valid JSON.`);
+      }
+
       if (json.success) {
         Alert.alert('Berhasil', 'Pendaftaran wajah berhasil diselesaikan');
         setIsModalVisible(false);
@@ -228,9 +271,9 @@ export default function AdminFaceRegistrationScreen() {
       } else {
         Alert.alert('Gagal', json.message || 'Terjadi kesalahan saat pendaftaran');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Registration error:', error);
-      Alert.alert('Error', 'Gagal menghubungi server');
+      Alert.alert('Error', error.message || 'Gagal menghubungi server');
     } finally {
       setIsProcessing(false);
     }
@@ -958,7 +1001,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   cameraOverlay: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.3)',
     justifyContent: 'space-between',
     padding: 24,

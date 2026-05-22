@@ -16,7 +16,6 @@ exports.getAllStudents = async (req, res) => {
                 k.nama_kelas as kelas,
                 k.prodi,
                 mk.kelas_id,
-                ms.permission_status
             FROM pengguna p
             LEFT JOIN mahasiswa_kelas mk ON p.id_user = mk.mahasiswa_id
             LEFT JOIN kelas k ON mk.kelas_id = k.id_kelas

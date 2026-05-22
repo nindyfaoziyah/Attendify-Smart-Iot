@@ -23,7 +23,8 @@ import { X, Trash2, Camera as CameraIcon } from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
 
-export default function IoTSensorValidationScreen() {
+// Prop added to support rendering inside the IoTUnifiedScreen without duplicate headers
+export default function IoTSensorValidationScreen({ isEmbedded = false }: { isEmbedded?: boolean }) {
   const navigation = useNavigation<any>();
   const { tokens, isLightTheme } = useTheme();
   const { token } = useAuth() as any;
@@ -210,28 +211,32 @@ export default function IoTSensorValidationScreen() {
     </BlurView>
   );
 
+  const BackgroundComponent = isEmbedded ? View : AnimatedBackground;
+
   return (
     <View style={styles.container}>
-      <StatusBar barStyle={isLightTheme ? "dark-content" : "light-content"} />
-    <AnimatedBackground style={styles.background}>
-        <View style={styles.header}>
-          <TouchableOpacity 
-            onPress={() => navigation.goBack()} 
-            style={[styles.backBtn, { backgroundColor: tokens.iconButtonBg }]}
-          >
-            <ArrowLeft color={tokens.textColor} size={24} />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: tokens.textColor }]}>Validasi Sensor IoT</Text>
-          <TouchableOpacity 
-            onPress={() => setIsLive(!isLive)} 
-            style={[styles.liveBtn, { borderColor: isLive ? '#10B981' : tokens.borderColor }]}
-          >
-            <Animated.View style={[styles.liveDot, { opacity: pulseAnim, backgroundColor: isLive ? '#10B981' : tokens.subTextColor }]} />
-            <Text style={[styles.liveText, { color: isLive ? '#10B981' : tokens.subTextColor }]}>LIVE</Text>
-          </TouchableOpacity>
-        </View>
+      {!isEmbedded && <StatusBar barStyle={isLightTheme ? "dark-content" : "light-content"} />}
+    <BackgroundComponent style={styles.background}>
+        {!isEmbedded && (
+          <View style={styles.header}>
+            <TouchableOpacity 
+              onPress={() => navigation.goBack()} 
+              style={[styles.backBtn, { backgroundColor: tokens.iconButtonBg }]}
+            >
+              <ArrowLeft color={tokens.textColor} size={24} />
+            </TouchableOpacity>
+            <Text style={[styles.headerTitle, { color: tokens.textColor }]}>Validasi Sensor IoT</Text>
+            <TouchableOpacity 
+              onPress={() => setIsLive(!isLive)} 
+              style={[styles.liveBtn, { borderColor: isLive ? '#10B981' : tokens.borderColor }]}
+            >
+              <Animated.View style={[styles.liveDot, { opacity: pulseAnim, backgroundColor: isLive ? '#10B981' : tokens.subTextColor }]} />
+              <Text style={[styles.liveText, { color: isLive ? '#10B981' : tokens.subTextColor }]}>LIVE</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={[styles.scrollContent, isEmbedded && { paddingTop: 20 }]} showsVerticalScrollIndicator={false}>
           <View style={styles.deviceGrid}>
             <BlurView intensity={20} tint={isLightTheme ? 'light' : 'dark'} style={[styles.deviceCard, { backgroundColor: tokens.cardBg, borderColor: tokens.borderColor }]}>
               <Cpu size={24} color={Colors.ai.primary} />
@@ -269,7 +274,7 @@ export default function IoTSensorValidationScreen() {
           </View>
 
         </ScrollView>
-      </AnimatedBackground>
+      </BackgroundComponent>
 
       {/* IoT Validation Modal */}
       <Modal visible={isModalVisible} animationType="slide" transparent={true}>

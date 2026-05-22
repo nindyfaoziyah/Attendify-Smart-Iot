@@ -47,9 +47,9 @@ const corsOptions = {
     credentials: true
 };
 app.use(cors(corsOptions));
-// Built-in middleware for json with extended body limit to handle base64 images
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+// Built-in middleware for json with extended body limit to handle large base64 images
+app.use(express.json({ limit: '200mb' }));
+app.use(express.urlencoded({ extended: true, limit: '200mb' }));
 
 // Static route for uploads folder
 app.use('/uploads', express.static('uploads'));

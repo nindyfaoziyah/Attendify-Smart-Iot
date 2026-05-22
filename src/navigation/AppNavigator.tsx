@@ -18,7 +18,6 @@ import PrivacySecurityScreen from '../screens/PrivacySecurityScreen';
 import ProfileDetailsScreen from '../screens/ProfileDetailsScreen';
 import AboutAttendifyScreen from '../screens/AboutAttendifyScreen';
 import AdminDashboardScreen from '../screens/AdminDashboardScreen';
-import AdminJadwalScreen from '../screens/AdminJadwalScreen';
 import ManageStudentsScreen from '../screens/ManageStudentsScreen';
 import ManageLecturersScreen from '../screens/ManageLecturersScreen';
 import IoTSensorValidationScreen from '../screens/IoTSensorValidationScreen';
@@ -31,6 +30,7 @@ import LaporanMasalahScreen from '../screens/LaporanMasalahScreen';
 import DosenDailyReportScreen from '../screens/DosenDailyReportScreen';
 import LiveMapScreen from '../screens/LiveMapScreen';
 import AnalyticsCommandCenterScreen from '../screens/AnalyticsCommandCenterScreen';
+import IoTUnifiedScreen from '../screens/IoTUnifiedScreen';
 import { Colors } from '@/constants/Colors';
 import { useTheme } from '../context/ThemeContext';
 
@@ -74,11 +74,6 @@ function TabNavigator() {
         name="Dashboard"
         component={HomeScreen}
         options={{ tabBarIcon: ({ color }) => <Home color={color} size={24} /> }}
-      />
-      <Tab.Screen
-        name="Jadwal"
-        component={JadwalScreen}
-        options={{ tabBarIcon: ({ color }) => <CalendarIcon color={color} size={24} /> }}
       />
       <Tab.Screen
         name="Profile"
@@ -127,14 +122,6 @@ function AdminTabNavigator() {
         options={{ 
           tabBarLabel: 'Dashboard',
           tabBarIcon: ({ color }) => <Home color={color} size={24} /> 
-        }}
-      />
-      <Tab.Screen
-        name="AdminJadwal"
-        component={AdminJadwalScreen}
-        options={{ 
-          tabBarLabel: 'Jadwal',
-          tabBarIcon: ({ color }) => <CalendarIcon color={color} size={24} /> 
         }}
       />
       <Tab.Screen
@@ -206,6 +193,7 @@ function MahasiswaNavigator() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="MainTabs" component={TabNavigator} />
+      <Stack.Screen name="Jadwal" component={JadwalScreen} />
       <Stack.Screen name="Scan" component={ScanScreen} />
       <Stack.Screen name="Notification" component={NotificationScreen} />
       <Stack.Screen name="Settings" component={SettingsScreen} />
@@ -274,21 +262,17 @@ function AdminNavigator() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="AdminMain" component={AdminTabNavigator} />
-      <Stack.Screen name="AdminJadwal" component={AdminJadwalScreen} />
       <Stack.Screen name="ManageStudents" component={ManageStudentsScreen} />
       <Stack.Screen name="ManageLecturers" component={ManageLecturersScreen} />
-      <Stack.Screen name="IoTSensor" component={IoTSensorValidationScreen} />
+      <Stack.Screen name="IoTSensor" component={IoTUnifiedScreen} />
       <Stack.Screen name="DatabaseLogs" component={DatabaseLogsScreen} />
       <Stack.Screen name="ManageAttendance" component={ManageAttendanceScreen} />
       <Stack.Screen name="Settings" component={SettingsScreen} />
       <Stack.Screen name="AdminReports" component={AdminReportsScreen} />
-      <Stack.Screen name="AdminFaceRegistration" component={AdminFaceRegistrationScreen} />
       <Stack.Screen name="ProfileDetails" component={ProfileDetailsScreen} />
       <Stack.Screen name="PrivacySecurity" component={PrivacySecurityScreen} />
       <Stack.Screen name="AboutAttendify" component={AboutAttendifyScreen} />
       <Stack.Screen name="Notification" component={NotificationScreen} />
-      <Stack.Screen name="LiveMap" component={LiveMapScreen} />
-      <Stack.Screen name="AnalyticsCommandCenter" component={AnalyticsCommandCenterScreen} />
     </Stack.Navigator>
   );
 }

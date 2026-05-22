@@ -12,7 +12,7 @@ import HourlyHeatmap from '../components/analytics/HourlyHeatmap';
 
 const { width } = Dimensions.get('window');
 
-export default function AnalyticsCommandCenterScreen() {
+export default function AnalyticsCommandCenterScreen({ isEmbedded = false }: { isEmbedded?: boolean }) {
   const { tokens, isLightTheme } = useTheme();
   const navigation = useNavigation();
   const [loading, setLoading] = useState(true);
@@ -28,8 +28,8 @@ export default function AnalyticsCommandCenterScreen() {
       
       // Fetch both dashboard stats (for KPIs) and heatmap data
       const [dashRes, heatRes] = await Promise.all([
-        fetch(`${API_URL}/api/analytics/dashboard`, { headers: { 'Authorization': `Bearer ${token}` } }),
-        fetch(`${API_URL}/api/analytics/heatmap`, { headers: { 'Authorization': `Bearer ${token}` } })
+        fetch(`${API_URL}/analytics/dashboard`, { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch(`${API_URL}/analytics/heatmap`, { headers: { 'Authorization': `Bearer ${token}` } })
       ]);
 
       const dashData = await dashRes.json();
@@ -68,20 +68,24 @@ export default function AnalyticsCommandCenterScreen() {
     busiestHour = data.hourly.reduce((max: any, cur: any) => cur.count > max.count ? cur : max);
   }
 
-  return (
-    <AnimatedBackground style={styles.container}>
-      {/* Floating Header */}
-      <BlurView intensity={40} tint={isLightTheme ? 'light' : 'dark'} style={[styles.header, { borderColor: tokens.borderColor, backgroundColor: tokens.cardBg }]}>
-         <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.iconButton, { backgroundColor: tokens.iconButtonBg }]}>
-            <ChevronLeft size={24} color={tokens.textColor} />
-         </TouchableOpacity>
-         <View style={{ flex: 1, marginLeft: 12 }}>
-            <Text style={[styles.headerTitle, { color: tokens.textColor }]}>Command Center</Text>
-            <Text style={[styles.headerSub, { color: tokens.subTextColor }]}>Enterprise Analytics Insights</Text>
-         </View>
-      </BlurView>
+  const BackgroundComponent = isEmbedded ? View : AnimatedBackground;
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+  return (
+    <BackgroundComponent style={styles.container}>
+      {/* Floating Header */}
+      {!isEmbedded && (
+        <BlurView intensity={40} tint={isLightTheme ? 'light' : 'dark'} style={[styles.header, { borderColor: tokens.borderColor, backgroundColor: tokens.cardBg }]}>
+           <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.iconButton, { backgroundColor: tokens.iconButtonBg }]}>
+              <ChevronLeft size={24} color={tokens.textColor} />
+           </TouchableOpacity>
+           <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={[styles.headerTitle, { color: tokens.textColor }]}>Command Center</Text>
+              <Text style={[styles.headerSub, { color: tokens.subTextColor }]}>Enterprise Analytics Insights</Text>
+           </View>
+        </BlurView>
+      )}
+
+      <ScrollView contentContainerStyle={[styles.scrollContent, isEmbedded && { paddingTop: 20 }]} showsVerticalScrollIndicator={false}>
         
         {/* KPI Grid */}
         <View style={styles.kpiGrid}>
@@ -152,7 +156,7 @@ export default function AnalyticsCommandCenterScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
-    </AnimatedBackground>
+    </BackgroundComponent>
   );
 }
 
