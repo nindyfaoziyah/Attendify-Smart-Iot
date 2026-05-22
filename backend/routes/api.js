@@ -132,6 +132,13 @@ router.get('/kelas/:id/mahasiswa', kelasCtrl.getMahasiswaByKelas);
 // 9. IoT / ESP32 CORE LOGIC (REAL AI RECOGNITION)
 // ======================================================
 router.post('/iot/recognize', iotCtrl.recognizeFromIoT);
+// === KODE BARU JALUR OUTBOUND DOSEN: TARUH DI SINI ===
+router.post('/iot/trigger-scan', iotCtrl.triggerHardwareScan);
+// =====================================================
+
+router.post('/iot/register-face', async (req, res) => {
+  // ... isi kode register-face bawaan kamu (jangan diubah) ...
+});
 
 router.post('/iot/register-face', async (req, res) => {
   try {

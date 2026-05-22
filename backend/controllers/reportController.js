@@ -3,7 +3,7 @@ const ExcelJS = require('exceljs');
 const PDFDocument = require('pdfkit');
 
 // ======================================================
-// COMMON QUERY (DIPERBAIKI)
+// COMMON QUERY 
 // ======================================================
 const getAttendanceData = async (classId, date, jadwalId) => {
     let query = `
@@ -76,7 +76,7 @@ exports.exportPDF = async (req, res) => {
         const doc = new PDFDocument({ margin: 50, size: 'A4' });
         doc.pipe(res);
 
-        // Header Instansi (Opsional, biar keren)
+        // Header Instansi
         doc.fontSize(16).text('ATTENDIFY - SISTEM ABSENSI WAJAH', { align: 'center', bullet: true });
         doc.fontSize(10).text('Laporan Kehadiran Mahasiswa Otomatis', { align: 'center' });
         doc.moveDown();
@@ -139,10 +139,63 @@ exports.exportPDF = async (req, res) => {
 };
 
 // ======================================================
-// EXPORT EXCEL & OTHER
+// EXPORT EXCEL (🌟 KINI AKTIF & MENGGUNAKAN DATA REAL)
 // ======================================================
 exports.exportExcel = async (req, res) => {
-    return res.status(501).json({ status: 'error', message: 'Not implemented' });
+    try {
+        const { class_id, jadwal_id, date } = req.query;
+
+        // Tarik data real mahasiswa menggunakan common query
+        const data = await getAttendanceData(class_id, date, jadwal_id);
+
+        if (!data || data.length === 0) {
+            return res.status(404).json({
+                status: 'error',
+                message: 'Tidak ada data absensi untuk sesi ini.'
+            });
+        }
+
+        const firstData = data[0];
+        const filename = `Laporan_Absensi_${firstData.subject.replace(/\s+/g, '_')}.xlsx`;
+
+        // Inisialisasi file Excel baru melalui ExcelJS
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('Data Presensi');
+
+        // Atur Judul Kolom Excel
+        worksheet.columns = [
+            { header: 'No', key: 'no', width: 6 },
+            { header: 'NIM', key: 'nim', width: 18 },
+            { header: 'Nama Mahasiswa', key: 'name', width: 30 },
+            { header: 'Jam Presensi', key: 'time', width: 15 },
+            { header: 'Status Kehadiran', key: 'status', width: 18 }
+        ];
+
+        // Loop data mahasiswa dari database ke baris Excel
+        data.forEach((item, index) => {
+            worksheet.addRow({
+                no: index + 1,
+                nim: item.nim,
+                name: item.name,
+                time: item.time || '--:--',
+                status: item.status.toUpperCase()
+            });
+        });
+
+        // Bikin text di baris pertama (Header) jadi Tebal
+        worksheet.getRow(1).font = { bold: true };
+
+        // Set response agar didownload browser berupa file .xlsx asli
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+        await workbook.xlsx.write(res);
+        res.end();
+
+    } catch (err) {
+        console.error('Excel Export Error:', err);
+        res.status(500).json({ status: 'error', message: err.message });
+    }
 };
 
 exports.exportAttendance = async (req, res) => {

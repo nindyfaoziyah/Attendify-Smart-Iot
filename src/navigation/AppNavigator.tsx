@@ -9,6 +9,8 @@ import ProfileScreen from '../screens/ProfileScreen';
 import ScanScreen from '../screens/ScanScreen';
 import NotificationScreen from '../screens/NotificationScreen';
 import DosenDashboardScreen from '../screens/DosenDashboardScreen';
+// Tambahan import untuk halaman detail sesi dosen baru
+import DosenDetailSesiScreen from '../screens/DosenDetailSesiScreen'; 
 import SettingsScreen from '../screens/SettingsScreen';
 import LoginScreen from '../screens/LoginScreen';
 import SplashScreen from '../screens/SplashScreen';
@@ -33,7 +35,6 @@ import AnalyticsCommandCenterScreen from '../screens/AnalyticsCommandCenterScree
 import IoTUnifiedScreen from '../screens/IoTUnifiedScreen';
 import { Colors } from '@/constants/Colors';
 import { useTheme } from '../context/ThemeContext';
-
 import { useAuth } from '../context/AuthContext';
 
 const Tab = createBottomTabNavigator();
@@ -213,6 +214,12 @@ function DosenNavigator() {
       <Stack.Screen 
         name="DosenMain" 
         component={DosenTabNavigator} 
+      />
+
+      {/* DISINI: Registrasi halaman detail sesi presensi IoT dosen */}
+      <Stack.Screen 
+        name="DosenDetailSesi" 
+        component={DosenDetailSesiScreen} 
       />
 
       <Stack.Screen 

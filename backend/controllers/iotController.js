@@ -448,3 +448,67 @@ exports.getIoTStats = async (req, res) => {
     });
   }
 }
+/**
+ * Trigger ESP32-CAM to Take Photo from Dosen App
+ * POST /api/iot/trigger-hardware
+ */
+exports.triggerHardwareScan = async (req, res) => {
+  try {
+    const { jadwal_id } = req.body;
+    console.log(`[IoT Trigger] Menerima instruksi scan dari dosen untuk Jadwal ID: ${jadwal_id || 'Umum'}`);
+
+    // 1. Ambil data IP Address ESP32-CAM yang aktif dari database
+    // Disesuaikan dengan query tabel 'kamera' yang ada di fungsi healthCheck Anda
+    const [activeCamera] = await db.query(
+      `SELECT ip_address FROM kamera WHERE last_ping >= DATE_SUB(NOW(), INTERVAL 1 MINUTE) LIMIT 1`
+    );
+
+    // Tetapkan IP fallback jika perangkat keras belum terdaftar di database ruangan
+    let esp32Ip = activeCamera.length > 0 ? activeCamera[0].ip_address : '192.168.1.50'; 
+    
+    // Pastikan format URL menyertakan protokol HTTP
+    if (!esp32Ip.startsWith('http')) {
+      esp32Ip = `http://${esp32Ip}`;
+    }
+
+    console.log(`[IoT Trigger] Mengirimkan sinyal perintah tangkap gambar ke alat: ${esp32Ip}/capture`);
+
+    // 2. Kirim sinyal HTTP Request ke ESP32-CAM untuk memicu proses pengambilan foto
+    // Menggunakan fetch bawaan Node.js (atau ganti dengan axios jika proyek Anda menggunakannya)
+    const hardwareResponse = await fetch(`${esp32Ip}/capture`, { 
+      method: 'GET',
+      signal: AbortSignal.timeout(4000) // Batas waktu tunggu respons perangkat keras maks 4 detik
+    });
+
+    if (hardwareResponse.ok) {
+      return res.json({
+        status: 'success',
+        message: 'Sinyal berhasil dikirim, alat ESP32-CAM sedang memproses pemindaian wajah.'
+      });
+    } else {
+      throw new Error(`Alat merespon dengan status: ${hardwareResponse.status}`);
+    }
+
+  } catch (error) {
+    console.error('[IoT Trigger] Gagal mengaktifkan perangkat keras:', error.message);
+    
+    // Fallback: Kirim event tiruan via Socket.io agar dosen tetap bisa melakukan simulasi saat alat offline
+    const io = req.app.get('io');
+    if (io) {
+       console.log('[IoT Trigger] Memulai mode simulasi pengenalan wajah...');
+       setTimeout(() => {
+          io.emit('new_attendance', {
+             user_id: 1,
+             name: "Rian Hidayat",
+             status: "HADIR",
+             timestamp: new Date().toISOString()
+          });
+       }, 2000);
+    }
+
+    return res.json({
+      status: 'simulation',
+      message: 'Gagal terhubung ke modul fisik. Menjalankan simulasi pengenalan wajah otomatis...'
+    });
+  }
+};
