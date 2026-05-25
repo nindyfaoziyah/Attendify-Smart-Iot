@@ -13,13 +13,19 @@ exports.getAllStudents = async (req, res) => {
                 p.email, 
                 p.username as nim,
                 p.role,
+                p.is_face_verified,
                 k.nama_kelas as kelas,
                 k.prodi,
                 mk.kelas_id,
+                fp.verification_status as biometric_status,
+                fp.face_image,
+                fp.confidence_score,
+                fp.registered_at,
+                fp.last_trained
             FROM pengguna p
             LEFT JOIN mahasiswa_kelas mk ON p.id_user = mk.mahasiswa_id
             LEFT JOIN kelas k ON mk.kelas_id = k.id_kelas
-            LEFT JOIN manual_scan_permission ms ON p.id_user = ms.user_id
+            LEFT JOIN face_profiles fp ON p.id_user = fp.user_id
             WHERE p.role = 'mahasiswa'
             ORDER BY p.nama ASC
         `);

@@ -265,10 +265,41 @@ exports.recognizeFromIoT = async (req, res) => {
       location_name: locName
     };
     if (io) {
-        // Emit to general channel for Dosen Dashboard
+        // ── Dosen Dashboard: new_attendance feed ──────────────────────
         io.emit('new_attendance', attendanceData);
-        // Emit to specific user for Mahasiswa Dashboard
+
+        // ── General attendance success ────────────────────────────────
         io.emit('ATTENDANCE_SUCCESS', attendanceData);
+
+        // ── NEW_ATTENDANCE: for live admin/dosen attendance count update
+        io.emit('NEW_ATTENDANCE', {
+            ...attendanceData,
+            status_label: statusAbsen === 'hadir' ? '✅ Hadir' : '⏰ Terlambat',
+            approval_label:
+                approvalStatus === 'APPROVED' ? 'Disetujui'
+                : approvalStatus === 'REVIEW_REQUIRED' ? 'Menunggu Review'
+                : 'Ditolak'
+        });
+
+        // ── FACE_VERIFIED: targeted update for the recognised mahasiswa
+        // The frontend listens and shows the absensi confirmation card
+        io.emit('FACE_VERIFIED', {
+            user_id:          matchedUser.id_user,
+            name:             matchedUser.nama,
+            kelas:            matchedUser.kelas || '-',
+            confidence:       confidencePct,
+            confidence_label: `${confidencePct.toFixed(1)}%`,
+            attendance_status: statusAbsen,
+            status_label:     statusAbsen === 'hadir' ? '✅ Absensi Berhasil' : '⏰ Terlambat',
+            approval_status:  approvalStatus,
+            location_name:    locName,
+            latitude:         parseFloat(lat),
+            longitude:        parseFloat(lng),
+            timestamp:        new Date().toISOString(),
+            device_id:        device_id,
+            mode:             mode,
+            photo:            fileName
+        });
     }
 
     // ── Success response ────────────────────────────

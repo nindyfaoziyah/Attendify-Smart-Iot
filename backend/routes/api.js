@@ -136,34 +136,8 @@ router.post('/iot/recognize', iotCtrl.recognizeFromIoT);
 router.post('/iot/trigger-scan', iotCtrl.triggerHardwareScan);
 // =====================================================
 
-router.post('/iot/register-face', async (req, res) => {
-  // ... isi kode register-face bawaan kamu (jangan diubah) ...
-});
-
-router.post('/iot/register-face', async (req, res) => {
-  try {
-    const { user_id, image } = req.body;
-    if (!user_id || !image) return res.status(400).json({ success: false, message: "Missing data" });
-    
-    const base64Data = image.replace(/^data:image\/\w+;base64,/, "");
-    const buffer = Buffer.from(base64Data, 'base64');
-    const descriptor = await faceService.encodeFace(buffer);
-    
-    if (!descriptor) return res.status(400).json({ success: false, message: "No face detected" });
-
-    const filename = `face_${user_id}_${Date.now()}.jpg`;
-    fs.writeFileSync(path.join(__dirname, '..', 'uploads', filename), buffer);
-
-    await db.query(
-      'UPDATE pengguna SET face_image = ?, face_descriptor = ? WHERE id_user = ?',
-      [filename, JSON.stringify(Array.from(descriptor)), user_id]
-    );
-
-    return res.status(200).json({ success: true, message: "Face registered" });
-  } catch (error) {
-    return res.status(500).json({ success: false, message: "Server error" });
-  }
-});
+// NOTE: Face registration is handled by /admin/face/register (adminFaceCtrl.registerFace)
+// which includes: image saving → AI embedding → DB persistence → cache invalidation → socket events
 
 router.post('/attendance/location', async (req, res) => {
   try {
