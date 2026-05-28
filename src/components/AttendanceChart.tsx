@@ -57,7 +57,7 @@ export const AttendanceChart: React.FC<AttendanceChartProps> = ({
           return (
             <View key={index} style={styles.chartRow}>
               <View style={styles.labelCol}>
-                <Text style={[styles.label, { color: tokens.textColor }]} numberOfLines={2}>
+                <Text style={[styles.label, { color: tokens.textColor }]} numberOfLines={1}>
                   {item.subject}
                 </Text>
                 <Text style={[styles.meta, { color: tokens.subTextColor }]}>
@@ -120,39 +120,43 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   chartRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-    gap: 12,
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    marginBottom: 24,
+    gap: 8,
   },
   labelCol: {
-    width: 90,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
   },
   label: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '600',
-    lineHeight: 14,
+    flex: 1,
+    marginRight: 12,
   },
   meta: {
-    fontSize: 11,
-    marginTop: 2,
+    fontSize: 12,
+    fontWeight: '500',
   },
   barSection: {
-    flex: 1,
-    height: 12,
-    borderRadius: 6,
+    width: '100%',
+    height: 18,
+    borderRadius: 9,
     overflow: 'hidden',
     position: 'relative',
     justifyContent: 'center',
   },
   bar: {
     height: '100%',
-    borderRadius: 6,
+    borderRadius: 8,
     justifyContent: 'center',
     paddingHorizontal: 8,
   },
   barText: {
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: 'bold',
     color: '#fff',
     position: 'absolute',

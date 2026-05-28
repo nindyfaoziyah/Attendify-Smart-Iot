@@ -67,13 +67,14 @@ exports.getMahasiswaByKelas = async (req, res) => {
             `
             SELECT 
                 pengguna.id_user,
-                pengguna.nama
-
+                pengguna.nama,
+                CASE 
+                    WHEN msp.enabled = 1 AND (msp.expires_at IS NULL OR msp.expires_at > NOW()) THEN 1 
+                    ELSE 0 
+                END AS scanPermission
             FROM mahasiswa_kelas
-
-            JOIN pengguna
-            ON mahasiswa_kelas.mahasiswa_id = pengguna.id_user
-
+            JOIN pengguna ON mahasiswa_kelas.mahasiswa_id = pengguna.id_user
+            LEFT JOIN manual_scan_permission msp ON pengguna.id_user = msp.user_id
             WHERE mahasiswa_kelas.kelas_id = ?
             `,
             [id]

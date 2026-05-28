@@ -59,6 +59,22 @@ exports.recognizeFromIoT = async (req, res) => {
     const logTimestamp = new Date().toISOString();
     console.log(`[IoT] ${logTimestamp} | Device: ${device_id} | Mode: ${mode} | Image size: ${imageSizeKB.toFixed(2)}KB`);
 
+    // ── Auto-Update IP Address ───────────────────────
+    // Tangkap IP aktual alat ESP32 dan simpan ke database agar Trigger Scan selalu berhasil
+    let espIp = req.headers['x-forwarded-for'] 
+      || req.socket?.remoteAddress 
+      || req.connection?.remoteAddress 
+      || req.ip 
+      || '';
+    espIp = espIp.replace(/^::ffff:/, '').trim();
+
+    if (espIp && espIp !== '127.0.0.1' && espIp !== '::1') {
+      await db.query(
+        `UPDATE kamera SET ip_address = ?, last_ping = NOW(), status = 'aktif' WHERE nama_kamera = ?`,
+        [espIp, device_id]
+      );
+    }
+
     // ── Save image to temp folder (for debugging) ───
     const imagesDir = path.join(__dirname, '../uploads/iot-captures');
     if (!fs.existsSync(imagesDir)) {
@@ -96,7 +112,7 @@ exports.recognizeFromIoT = async (req, res) => {
       if (matchResult && matchResult.spoof) {
           // Log suspicious activity
           await db.query(
-              `INSERT INTO suspicious_logs (device_id, event_type, confidence, image_path, notes) VALUES (?, ?, ?, ?, ?)`,
+              `INSERT INTO suspicious_logs (device_id, event_type, confidence, image_path, description) VALUES (?, ?, ?, ?, ?)`,
               [device_id, matchResult.type || 'SPOOF_ATTEMPT', matchResult.confidence || 0, fileName, matchResult.message]
           );
           
@@ -122,9 +138,9 @@ exports.recognizeFromIoT = async (req, res) => {
     // Determine approval status based on confidence
     const confidencePct = matchResult.confidence * 100;
     let approvalStatus = 'APPROVED';
-    if (confidencePct < 80) {
+    if (confidencePct < 50) {
         approvalStatus = 'REJECTED';
-    } else if (confidencePct >= 80 && confidencePct < 95) {
+    } else if (confidencePct >= 50 && confidencePct < 70) {
         approvalStatus = 'REVIEW_REQUIRED';
     }
 
@@ -210,22 +226,51 @@ exports.recognizeFromIoT = async (req, res) => {
 
     // ── Insert attendance record ────────────────────
     await db.query(
-      `INSERT INTO absensi (user_id, jadwal_id, tanggal, waktu_datang, status, manual_mode, approval_status, approved_at, latitude, longitude, location_name) 
-       VALUES (?, ?, NOW(), CURTIME(), ?, ?, ?, NOW(), ?, ?, ?)`,
-      [matchedUser.id_user, jadwalId, statusAbsen, manualMode, approvalStatus, lat, lng, locName]
+      `INSERT INTO absensi (user_id, jadwal_id, tanggal, waktu_datang, status, manual_mode, keterangan) 
+       VALUES (?, ?, NOW(), CURTIME(), ?, ?, ?)`,
+      [matchedUser.id_user, jadwalId, statusAbsen, manualMode, 'Hadir via AI (ESP32-CAM)']
     );
 
-    // ── Create notification ─────────────────────────
-    await db.query(
-      `INSERT INTO notifications (receiver_user_id, type, title, message, is_read) 
-       VALUES (?, ?, ?, ?, FALSE)`,
-      [
-        matchedUser.id_user,
-        'ATTENDANCE_SUCCESS',
-        approvalStatus === 'APPROVED' ? 'Absensi IoT Berhasil' : (approvalStatus === 'REVIEW_REQUIRED' ? 'Absensi Menunggu Review' : 'Absensi Ditolak'),
-        `Absensi AI (${confidencePct.toFixed(1)}%): ${statusAbsen === 'hadir' ? '✅ Hadir' : '⏰ Terlambat'} - ${approvalStatus}`
-      ]
-    );
+    // ── Create notifications ────────────────────────────────────────
+    try {
+      const waktuLabel = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+      const statusLabel = statusAbsen === 'hadir' ? 'Hadir' : 'Terlambat';
+      const modeLabel = manualMode ? 'scan manual' : 'IoT otomatis';
+
+      // 1. Notifikasi ke MAHASISWA yang bersangkutan
+      await db.query(
+        `INSERT INTO notifications (receiver_user_id, sender_user_id, type, title, message, is_read)
+         VALUES (?, NULL, 'ATTENDANCE_SUCCESS', 'Absensi Berhasil', ?, FALSE)`,
+        [matchedUser.id_user, `${statusLabel} — Kehadiranmu pukul ${waktuLabel} berhasil dicatat via ${modeLabel}.`]
+      );
+
+      // 2. Notifikasi ke DOSEN pengajar jadwal aktif
+      const [jadwalInfo] = await db.query(
+        `SELECT j.dosen_id, m.nama_mk FROM jadwal_kuliah j
+         JOIN mata_kuliah m ON j.mata_kuliah_id = m.id_mk
+         WHERE j.id_jadwal = ?`, [jadwalId]
+      );
+      if (jadwalInfo.length > 0) {
+        const { dosen_id, nama_mk } = jadwalInfo[0];
+        await db.query(
+          `INSERT INTO notifications (receiver_user_id, sender_user_id, type, title, message, is_read)
+           VALUES (?, ?, 'ATTENDANCE_SUCCESS', 'Mahasiswa Hadir', ?, FALSE)`,
+          [dosen_id, matchedUser.id_user, `${matchedUser.nama} hadir di kelas ${nama_mk} pukul ${waktuLabel} (${statusLabel}).`]
+        );
+      }
+
+      // 3. Notifikasi ke ADMIN
+      const [admins] = await db.query(`SELECT id_user FROM pengguna WHERE role = 'admin' LIMIT 1`);
+      if (admins.length > 0) {
+        await db.query(
+          `INSERT INTO notifications (receiver_user_id, sender_user_id, type, title, message, is_read)
+           VALUES (?, ?, 'ATTENDANCE_SUCCESS', 'Rekap Absensi', ?, FALSE)`,
+          [admins[0].id_user, matchedUser.id_user, `${matchedUser.nama} tercatat ${statusLabel} via ${modeLabel} pukul ${waktuLabel}.`]
+        );
+      }
+    } catch (notifErr) {
+      console.warn('[IoT] Notifikasi gagal dikirim:', notifErr.message);
+    }
 
     // ── DISABLE MANUAL PERMISSION after success ─────
     if (manualMode === 1) {
@@ -420,19 +465,38 @@ exports.healthCheck = async (req, res) => {
       });
     }
 
-    console.log(`[IoT] Health check from device: ${device_id}`);
+    // Ambil IP ESP32 yang sesungguhnya dari request
+    let espIp = req.headers['x-forwarded-for'] 
+      || req.socket?.remoteAddress 
+      || req.connection?.remoteAddress 
+      || req.ip 
+      || '';
+    
+    // Bersihkan format IPv6 prefix (::ffff:192.168.x.x → 192.168.x.x)
+    espIp = espIp.replace(/^::ffff:/, '').trim();
+
+    console.log(`[IoT] Health check from device: ${device_id} | Real IP: ${espIp}`);
+
+    // Auto-update ip_address ESP32 yang benar + last_ping
+    if (espIp && espIp !== '127.0.0.1' && espIp !== '::1') {
+      await db.query(
+        `UPDATE kamera SET ip_address = ?, last_ping = NOW(), status = 'aktif' WHERE nama_kamera = ?`,
+        [espIp, device_id]
+      );
+      console.log(`[IoT] IP ESP32 diperbarui: ${device_id} → ${espIp}`);
+    } else {
+      // Kalau IP tidak valid, minimal update last_ping saja
+      await db.query(
+        `UPDATE kamera SET last_ping = NOW() WHERE nama_kamera = ?`,
+        [device_id]
+      );
+    }
 
     // Check if active schedule exists
     const [activeJadwal] = await db.query(
       `SELECT id_jadwal FROM jadwal_kuliah 
        WHERE CURRENT_TIME() BETWEEN jam_mulai AND jam_selesai 
        LIMIT 1`
-    );
-
-    // Update last_ping
-    await db.query(
-      `UPDATE kamera SET last_ping = NOW() WHERE ip_address = ? OR nama_kamera = ?`,
-      [req.ip || req.connection.remoteAddress, device_id]
     );
 
     return res.json({
@@ -486,60 +550,88 @@ exports.getIoTStats = async (req, res) => {
 exports.triggerHardwareScan = async (req, res) => {
   try {
     const { jadwal_id } = req.body;
-    console.log(`[IoT Trigger] Menerima instruksi scan dari dosen untuk Jadwal ID: ${jadwal_id || 'Umum'}`);
+    console.log(`[IoT Trigger] Instruksi scan dari dosen. Jadwal ID: ${jadwal_id || 'Umum'}`);
 
-    // 1. Ambil data IP Address ESP32-CAM yang aktif dari database
-    // Disesuaikan dengan query tabel 'kamera' yang ada di fungsi healthCheck Anda
+    // 1. Cari IP ESP32 dari tabel kamera dengan status aktif
     const [activeCamera] = await db.query(
-      `SELECT ip_address FROM kamera WHERE last_ping >= DATE_SUB(NOW(), INTERVAL 1 MINUTE) LIMIT 1`
+      `SELECT ip_address, nama_kamera FROM kamera 
+       WHERE status = 'aktif'
+       ORDER BY last_ping DESC LIMIT 1`
     );
 
-    // Tetapkan IP fallback jika perangkat keras belum terdaftar di database ruangan
-    let esp32Ip = activeCamera.length > 0 ? activeCamera[0].ip_address : '192.168.1.50'; 
-    
-    // Pastikan format URL menyertakan protokol HTTP
-    if (!esp32Ip.startsWith('http')) {
-      esp32Ip = `http://${esp32Ip}`;
+    let esp32Ip = null;
+    if (activeCamera.length > 0) {
+      esp32Ip = activeCamera[0].ip_address;
+      if (!esp32Ip.startsWith('http')) esp32Ip = `http://${esp32Ip}`;
     }
 
-    console.log(`[IoT Trigger] Mengirimkan sinyal perintah tangkap gambar ke alat: ${esp32Ip}/capture`);
+    if (!esp32Ip) {
+      // Tidak ada kamera terdaftar aktif — langsung masuk mode simulasi
+      throw new Error('Tidak ada kamera ESP32 aktif yang terdaftar dalam 2 menit terakhir.');
+    }
 
-    // 2. Kirim sinyal HTTP Request ke ESP32-CAM untuk memicu proses pengambilan foto
-    // Menggunakan fetch bawaan Node.js (atau ganti dengan axios jika proyek Anda menggunakannya)
-    const hardwareResponse = await fetch(`${esp32Ip}/capture`, { 
+    console.log(`[IoT Trigger] ESP32 ditemukan di: ${esp32Ip}`);
+
+    // 2. Cek status ESP32 dulu via /status (timeout 3 detik)
+    let isOnline = false;
+    try {
+      const statusRes = await fetch(`${esp32Ip}/status`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(3000)
+      });
+      isOnline = statusRes.ok;
+      if (isOnline) {
+        const statusData = await statusRes.json();
+        console.log(`[IoT Trigger] ESP32 online. RSSI: ${statusData.rssi}, Heap: ${statusData.free_heap}`);
+      }
+    } catch (e) {
+      console.warn(`[IoT Trigger] ESP32 tidak merespon /status: ${e.message}`);
+    }
+
+    if (!isOnline) {
+      throw new Error(`ESP32 di ${esp32Ip} tidak merespon (offline atau IP berubah).`);
+    }
+
+    // 3. Kirim perintah capture ke ESP32
+    const captureRes = await fetch(`${esp32Ip}/capture`, {
       method: 'GET',
-      signal: AbortSignal.timeout(4000) // Batas waktu tunggu respons perangkat keras maks 4 detik
+      signal: AbortSignal.timeout(5000)
     });
 
-    if (hardwareResponse.ok) {
+    if (captureRes.ok) {
+      const captureData = await captureRes.json().catch(() => ({}));
+      console.log(`[IoT Trigger] Perintah capture berhasil dikirim ke ESP32.`);
       return res.json({
         status: 'success',
-        message: 'Sinyal berhasil dikirim, alat ESP32-CAM sedang memproses pemindaian wajah.'
+        message: `Kamera aktif! ESP32 sedang mengambil foto dan memproses pengenalan wajah.`,
+        esp32_ip: esp32Ip,
+        esp32_response: captureData.message || 'ok'
       });
     } else {
-      throw new Error(`Alat merespon dengan status: ${hardwareResponse.status}`);
+      throw new Error(`ESP32 merespon /capture dengan status: ${captureRes.status}`);
     }
 
   } catch (error) {
-    console.error('[IoT Trigger] Gagal mengaktifkan perangkat keras:', error.message);
-    
-    // Fallback: Kirim event tiruan via Socket.io agar dosen tetap bisa melakukan simulasi saat alat offline
+    console.error('[IoT Trigger] Gagal:', error.message);
+
+    // Fallback simulasi — emit socket agar frontend tetap bisa demo
     const io = req.app.get('io');
     if (io) {
-       console.log('[IoT Trigger] Memulai mode simulasi pengenalan wajah...');
-       setTimeout(() => {
-          io.emit('new_attendance', {
-             user_id: 1,
-             name: "Rian Hidayat",
-             status: "HADIR",
-             timestamp: new Date().toISOString()
-          });
-       }, 2000);
+      console.log('[IoT Trigger] Mode simulasi aktif...');
+      setTimeout(() => {
+        io.emit('new_attendance', {
+          user_id: 1,
+          name: 'Simulasi Mahasiswa',
+          status: 'HADIR',
+          timestamp: new Date().toISOString()
+        });
+      }, 2000);
     }
 
     return res.json({
       status: 'simulation',
-      message: 'Gagal terhubung ke modul fisik. Menjalankan simulasi pengenalan wajah otomatis...'
+      message: 'Alat ESP32 tidak terdeteksi. Mode simulasi dijalankan.',
+      error: error.message
     });
   }
 };

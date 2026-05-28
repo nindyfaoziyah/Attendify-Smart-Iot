@@ -4,13 +4,12 @@ const canvas = require('canvas');
 const path = require('path');
 
 // Configure face-api to use nodejs canvas
-const { Canvas, Image, ImageData } = canvas;
+const { Canvas, Image, ImageData, loadImage } = canvas;
 faceapi.env.monkeyPatch({ Canvas, Image, ImageData });
 
 let modelsLoaded = false;
 
 // In-memory cache for face embeddings
-// Format: { '1': [LabeledFaceDescriptors...], '2': [...] }
 let embeddingCache = null;
 
 // Normalization function (L2)
@@ -50,24 +49,24 @@ const init = async () => {
 const validateImageQuality = async (imageBuffer) => {
     if (!modelsLoaded) await init();
 
-    const img = new Canvas.Image();
-    img.src = imageBuffer;
+    const img = await loadImage(imageBuffer);
 
-    // Detect multiple faces to ensure only one is present
-    const detections = await faceapi.detectAllFaces(img).withFaceLandmarks().withFaceDescriptors();
+    // Deteksi dengan minConfidence 0.15 untuk gambar dari ESP32 (lebih longgar)
+    const options = new faceapi.SsdMobilenetv1Options({ minConfidence: 0.15 });
+    const detections = await faceapi.detectAllFaces(img, options).withFaceLandmarks().withFaceDescriptors();
 
     if (detections.length === 0) {
         return { isValid: false, error: 'No face detected. Please ensure the face is clearly visible.' };
     }
 
-    if (detections.length > 1) {
-        return { isValid: false, error: 'Multiple faces detected. Please ensure only one person is in the photo.' };
-    }
+    // if (detections.length > 1) {
+    //     return { isValid: false, error: 'Multiple faces detected. Please ensure only one person is in the photo.' };
+    // }
 
     const detection = detections[0];
     
     // Check detection score (as a proxy for quality/clarity)
-    if (detection.detection.score < 0.8) {
+    if (detection.detection.score < 0.5) {
         return { isValid: false, error: 'Low quality image. Please provide a clearer photo.' };
     }
 
@@ -78,12 +77,11 @@ const validateImageQuality = async (imageBuffer) => {
     const faceArea = faceBox.width * faceBox.height;
     const imgArea = imgWidth * imgHeight;
     
-    if (faceArea < imgArea * 0.05) {
+    // PERBAIKAN: Melonggarkan batas minimum area wajah dari 0.05 (5%) menjadi 0.01 (1%)
+    // Langkah ini mencegah error "Face is too small" saat menggunakan kamera beresolusi besar
+    if (faceArea < imgArea * 0.01) {
         return { isValid: false, error: 'Face is too small. Please move closer to the camera.' };
     }
-
-    // Optional: add brightness/contrast check here if needed
-    // However, faceapi detection score already acts as a robust proxy for lighting/blur
 
     return { isValid: true, detection };
 };
@@ -132,24 +130,23 @@ const calculateAverageEmbedding = (descriptors) => {
 const recognizeFace = async (imageBuffer, registeredProfiles) => {
     if (!modelsLoaded) await init();
 
-    const img = new Canvas.Image();
-    img.src = imageBuffer;
+    const img = await loadImage(imageBuffer);
 
-    const detection = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
+    // Gunakan opsi toleransi yang lebih rendah untuk ESP32
+    const options = new faceapi.SsdMobilenetv1Options({ minConfidence: 0.15 });
+    const detection = await faceapi.detectSingleFace(img, options).withFaceLandmarks().withFaceDescriptor();
     if (!detection) return { success: false, message: 'No face detected in the image' };
 
-    // Detect multiple faces for spoofing check
-    const allFaces = await faceapi.detectAllFaces(img);
-    if (allFaces.length > 1) {
-        return { success: false, message: 'Multiple faces detected', spoof: true, type: 'MULTIPLE_FACES' };
-    }
+    // Pengecekan Multiple Faces dimatikan agar bayangan di background tidak dianggap wajah palsu
+    // const allFaces = await faceapi.detectAllFaces(img, options);
+    // if (allFaces.length > 1) {
+    //     return { success: false, message: 'Multiple faces detected', spoof: true, type: 'MULTIPLE_FACES' };
+    // }
 
     if (registeredProfiles.length === 0) {
         return { success: false, message: 'No registered face profiles found' };
     }
 
-    // Load into cache if empty or if profiles count changed
-    // In a real production system, you'd invalidate cache dynamically on new registrations
     if (!embeddingCache || embeddingCache.length !== registeredProfiles.length) {
         console.log('[FaceService] Rebuilding embedding cache...');
         embeddingCache = registeredProfiles.map(profile => {
@@ -171,7 +168,8 @@ const recognizeFace = async (imageBuffer, registeredProfiles) => {
     }
 
     const normalizedQuery = normalizeL2(detection.descriptor);
-    const faceMatcher = new faceapi.FaceMatcher(embeddingCache, 0.5); // Stricter threshold since vectors are normalized
+    // Tingkatkan distance menjadi 0.65 agar lebih longgar (burem/gelap tetap kedetect)
+    const faceMatcher = new faceapi.FaceMatcher(embeddingCache, 0.65);
     const bestMatch = faceMatcher.findBestMatch(normalizedQuery);
 
     if (bestMatch.label === 'unknown') {

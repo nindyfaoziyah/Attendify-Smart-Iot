@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, RefreshControl, Image, Alert } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, RefreshControl, Image, Alert, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Send, Image as ImageIcon, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -8,6 +8,7 @@ import { Colors } from '@/constants/Colors';
 import { API_URL } from '@/constants/Config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSocket } from '../context/SocketContext';
+import AnimatedBackground from '../components/ui/AnimatedBackground';
 
 export default function LaporanMasalahScreen() {
   const navigation = useNavigation();
@@ -61,7 +62,11 @@ export default function LaporanMasalahScreen() {
 
   const handleSubmit = async () => {
     if (!title || !description || !category || !location) {
-      Alert.alert('Error', 'Harap isi semua field wajib.');
+      if (Platform.OS === 'web') {
+        window.alert('Harap isi semua field wajib.');
+      } else {
+        Alert.alert('Error', 'Harap isi semua field wajib.');
+      }
       return;
     }
     
@@ -86,15 +91,25 @@ export default function LaporanMasalahScreen() {
       });
       const data = await response.json();
       if (data?.status === 'success') {
-        Alert.alert('Sukses', 'Laporan berhasil dikirim!');
+        if (Platform.OS === 'web') {
+          window.alert('Laporan berhasil dikirim!');
+        } else {
+          Alert.alert('Sukses', 'Laporan berhasil dikirim!');
+        }
         setTitle('');
         setDescription('');
         setCategory('');
         setLocation('');
         fetchReports();
+      } else {
+        throw new Error(data?.message || 'Gagal mengirim laporan');
       }
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Gagal mengirim laporan');
+      if (Platform.OS === 'web') {
+        window.alert(error.message || 'Gagal mengirim laporan');
+      } else {
+        Alert.alert('Error', error.message || 'Gagal mengirim laporan');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -110,9 +125,10 @@ export default function LaporanMasalahScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: isLightTheme ? '#F8FAFC' : '#0F172A' }]}>
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor: tokens.cardBg, borderBottomColor: tokens.borderColor }]}>
+    <AnimatedBackground style={styles.container}>
+      <SafeAreaView style={styles.container}>
+        {/* Header */}
+        <View style={[styles.header, { backgroundColor: tokens.cardBg, borderBottomColor: tokens.borderColor }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <ArrowLeft color={tokens.textColor} size={24} />
         </TouchableOpacity>
@@ -200,7 +216,8 @@ export default function LaporanMasalahScreen() {
           })
         )}
       </ScrollView>
-    </SafeAreaView>
+      </SafeAreaView>
+    </AnimatedBackground>
   );
 }
 

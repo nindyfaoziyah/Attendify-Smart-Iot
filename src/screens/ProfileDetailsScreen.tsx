@@ -83,17 +83,19 @@ export default function ProfileDetailsScreen() {
       const token = await getAuthToken();
       let finalAvatar = avatar;
 
-      // Upload avatar ke server jika berubah dan merupakan URI lokal (bukan URL http atau data base64)
-      if (avatar && !avatar.startsWith('http') && !avatar.startsWith('data:')) {
+      // Upload avatar hanya jika di native (bukan web) dan URI bukan URL atau base64
+      if (
+        Platform.OS !== 'web' &&
+        avatar &&
+        !avatar.startsWith('http') &&
+        !avatar.startsWith('data:')
+      ) {
         try {
-          // Konversi URI lokal ke base64
           const base64 = await FileSystem.readAsStringAsync(avatar, {
             encoding: 'base64',
           });
-          const mimeType = 'image/jpeg';
-          const base64Data = `data:${mimeType};base64,${base64}`;
+          const base64Data = `data:image/jpeg;base64,${base64}`;
 
-          // Upload ke server
           const uploadRes = await fetch(`${API_URL}/profile/avatar`, {
             method: 'POST',
             headers: {
@@ -106,29 +108,28 @@ export default function ProfileDetailsScreen() {
           const uploadResult = await uploadRes.json();
           if (uploadResult.status === 'success') {
             finalAvatar = uploadResult.data.foto_profil;
-            console.log('✅ Avatar uploaded to server');
           } else {
             throw new Error(uploadResult.message);
           }
         } catch (uploadErr) {
           console.error('Avatar upload error:', uploadErr);
-          showAlert('Peringatan', 'Gagal menyimpan foto ke server, tapi data lain berhasil disimpan.', 'error');
+          // Jangan gagalkan simpan profil hanya karena foto gagal
         }
       }
 
-      // Update profile data
+      // Update data profil (nama & phone)
       const profileRes = await fetch(`${API_URL}/profile/update`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({ name, prodi, kelas, phone }),
+        body: JSON.stringify({ name, phone }),
       });
 
       const profileResult = await profileRes.json();
 
-      if (profileResult.status === 'success' || !token) {
+      if (profileResult.status === 'success') {
         const updatedUser = user
           ? { ...user, fullName: name, email, avatar: finalAvatar, prodi, kelas, phone, nim: idNumber }
           : { fullName: name, email, avatar: finalAvatar, prodi, kelas, phone, nim: idNumber };
@@ -144,7 +145,7 @@ export default function ProfileDetailsScreen() {
       }
     } catch (e: any) {
       console.error('Save error:', e);
-      showAlert('Gagal', 'Terjadi kesalahan saat menyimpan.', 'error');
+      showAlert('Gagal', `Terjadi kesalahan saat menyimpan: ${e.message}`, 'error');
     } finally {
       setSaving(false);
     }
@@ -177,25 +178,37 @@ export default function ProfileDetailsScreen() {
 
           {/* Avatar */}
           <View style={styles.avatarSection}>
-            <TouchableOpacity onPress={pickImage} activeOpacity={0.8} style={{ alignItems: 'center' }}>
-              {avatar ? (
-                <Image source={{ uri: avatar }} style={{ width: 120, height: 120, borderRadius: 60, borderWidth: 4, borderColor: tokens.borderColor }} />
-              ) : (
-                <LinearGradient
-                  colors={isLightTheme ? ['#1E4FA8', '#2D6CDF'] : ['#3B82F6', '#8B5CF6']}
-                  style={styles.avatarGradient}
-                >
-                  <User size={80} color="#fff" />
-                </LinearGradient>
-              )}
-              
-              <View style={{ position: 'absolute', bottom: 0, right: 0, backgroundColor: isLightTheme ? '#1E4FA8' : '#3B82F6', padding: 8, borderRadius: 20 }}>
+            <View style={{ position: 'relative' }}>
+              <TouchableOpacity onPress={pickImage} activeOpacity={0.8}>
+                {avatar ? (
+                  <Image source={{ uri: avatar }} style={{ width: 120, height: 120, borderRadius: 60, borderWidth: 4, borderColor: tokens.borderColor }} />
+                ) : (
+                  <LinearGradient
+                    colors={isLightTheme ? ['#1E4FA8', '#2D6CDF'] : ['#3B82F6', '#8B5CF6']}
+                    style={styles.avatarGradient}
+                  >
+                    <User size={80} color="#fff" />
+                  </LinearGradient>
+                )}
+              </TouchableOpacity>
+
+              {/* Kamera icon - klik untuk ganti foto */}
+              <TouchableOpacity
+                onPress={pickImage}
+                style={{ position: 'absolute', bottom: 0, right: 0, backgroundColor: isLightTheme ? '#1E4FA8' : '#3B82F6', padding: 8, borderRadius: 20 }}
+              >
                 <Camera size={16} color="#fff" />
-              </View>
-            </TouchableOpacity>
-            
-            <View style={[styles.statusBadge, { marginTop: 16 }]}>
-              <Text style={[styles.statusText, { color: isLightTheme ? '#1E4FA8' : Colors.ai.primary }]}>{avatar ? 'Edit Foto' : 'Pilih Foto'}</Text>
+              </TouchableOpacity>
+
+              {/* Tombol hapus foto - hanya muncul jika ada foto */}
+              {avatar ? (
+                <TouchableOpacity
+                  onPress={() => { setAvatar(''); setChanged(true); }}
+                  style={{ position: 'absolute', top: 0, right: 0, backgroundColor: '#EF4444', width: 26, height: 26, borderRadius: 13, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#fff' }}
+                >
+                  <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold', lineHeight: 14 }}>✕</Text>
+                </TouchableOpacity>
+              ) : null}
             </View>
           </View>
 
@@ -255,15 +268,9 @@ export default function ProfileDetailsScreen() {
                 </View>
                 <View style={styles.fieldContent}>
                   <TextInput
-                    style={[styles.input, { color: tokens.textColor, borderBottomColor: tokens.borderColor }]}
+                    style={[styles.input, { color: tokens.subTextColor, borderBottomColor: tokens.borderColor }]}
                     value={idNumber}
-                    onChangeText={(t) => {
-                      setIdNumber(t);
-                      setChanged(true);
-                    }}
-                    placeholder={role === 'dosen' ? 'NIP' : role === 'admin' ? 'Admin ID' : 'NIM'}
-                    placeholderTextColor={tokens.subTextColor}
-                    editable={!saving}
+                    editable={false}
                   />
                 </View>
               </View>
@@ -356,10 +363,9 @@ export default function ProfileDetailsScreen() {
             <TouchableOpacity
               style={[
                 styles.primaryButton,
-                { opacity: changed ? 1 : 0.5 },
               ]}
               onPress={handleSave}
-              disabled={!changed}
+              disabled={saving}
             >
               <Text style={styles.primaryButtonText}>
                 {saving ? 'Menyimpan...' : 'Simpan'}
@@ -374,7 +380,12 @@ export default function ProfileDetailsScreen() {
         title={alertConfig.title}
         message={alertConfig.message}
         type={alertConfig.type}
-        onClose={() => setAlertConfig(prev => ({ ...prev, visible: false }))}
+        onClose={() => {
+          setAlertConfig(prev => ({ ...prev, visible: false }));
+          if (alertConfig.type === 'success') {
+            navigation.goBack();
+          }
+        }}
       />
     </AnimatedBackground>
   );
@@ -386,7 +397,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingTop: Platform.OS === 'ios' ? 20 : 10,
-    paddingBottom: 40,
+    paddingBottom: Platform.OS === 'web' ? 40 : 100,
   },
   fieldsContainer: {
     marginBottom: 10,
@@ -406,7 +417,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 50,
+    paddingTop: Platform.OS === 'web' ? 20 : Platform.OS === 'ios' ? 60 : 50,
     paddingHorizontal: 20,
     paddingBottom: 20,
   },

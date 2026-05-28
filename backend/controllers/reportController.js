@@ -15,19 +15,29 @@ const getAttendanceData = async (classId, date, jadwalId) => {
             k.nama_kelas as class_name,
             d.nama as dosen_name,
             jk.ruang,
-            a.tanggal, 
+            IFNULL(a.tanggal, CURDATE()) as tanggal, 
             a.waktu_datang as time, 
-            a.status
-        FROM absensi a
-        JOIN pengguna p ON a.user_id = p.id_user
-        JOIN jadwal_kuliah jk ON a.jadwal_id = jk.id_jadwal
-        JOIN mata_kuliah mk ON jk.mata_kuliah_id = mk.id_mk
+            IFNULL(a.status, 'BELUM HADIR') as status
+        FROM jadwal_kuliah jk
         JOIN kelas k ON jk.kelas_id = k.id_kelas
+        JOIN mata_kuliah mk ON jk.mata_kuliah_id = mk.id_mk
         JOIN pengguna d ON jk.dosen_id = d.id_user
-        WHERE 1=1
+        JOIN mahasiswa_kelas mak ON k.id_kelas = mak.kelas_id
+        JOIN pengguna p ON mak.mahasiswa_id = p.id_user
+        LEFT JOIN absensi a ON p.id_user = a.user_id AND a.jadwal_id = jk.id_jadwal
     `;
 
     const params = [];
+
+    // Filter tanggal masuk ke dalam kondisi LEFT JOIN agar tidak menghilangkan mahasiswa yang belum absen
+    if (date) {
+        query += " AND DATE(a.tanggal) = ? ";
+        params.push(date);
+    } else {
+        query += " AND DATE(a.tanggal) = CURDATE() ";
+    }
+
+    query += " WHERE 1=1 ";
 
     // Filter berdasarkan Jadwal ID (Paling Akurat)
     if (jadwalId && jadwalId !== 'null' && jadwalId !== 'undefined') {
@@ -40,12 +50,7 @@ const getAttendanceData = async (classId, date, jadwalId) => {
         params.push(classId);
     }
 
-    if (date) {
-        query += " AND DATE(a.tanggal) = ?";
-        params.push(date);
-    }
-
-    query += " ORDER BY a.waktu_datang ASC";
+    query += " ORDER BY p.nama ASC";
 
     const [rows] = await db.query(query, params);
     return rows;
@@ -95,15 +100,18 @@ exports.exportPDF = async (req, res) => {
         doc.font('Helvetica-Bold').fontSize(10);
         doc.text('No', 50, tableTop);
         doc.text('NIM', 80, tableTop);
-        doc.text('Nama Mahasiswa', 180, tableTop);
+        doc.text('Nama Mahasiswa', 160, tableTop);
         doc.text('Jam', 380, tableTop);
-        doc.text('Status', 480, tableTop);
+        doc.text('Status', 450, tableTop);
         
         doc.moveTo(50, tableTop + 15).lineTo(545, tableTop + 15).stroke();
         doc.font('Helvetica').moveDown();
 
+        // Hitung total hadir
+        let totalHadir = 0;
+
         // TABLE ROWS
-        let currentY = tableTop + 25;
+        let currentY = tableTop + 22;
         data.forEach((item, index) => {
             // Cek jika halaman penuh
             if (currentY > 750) {
@@ -111,16 +119,27 @@ exports.exportPDF = async (req, res) => {
                 currentY = 50; 
             }
 
+            // Background untuk baris genap (Zebra Striping)
+            if (index % 2 === 0) {
+                doc.rect(50, currentY - 4, 495, 20).fill('#f8fafc');
+                doc.fillColor('black');
+            }
+
             doc.text(index + 1, 50, currentY);
-            doc.text(item.nim, 80, currentY);
-            doc.text(item.name, 180, currentY, { width: 190 });
+            doc.text(item.nim || '-', 80, currentY);
+            doc.text(item.name, 160, currentY, { width: 210, lineBreak: false });
             doc.text(item.time || '--:--', 380, currentY);
             
-            // Warna Status (Hijau untuk Hadir)
-            if (item.status.toUpperCase() === 'HADIR') {
-                doc.fillColor('green').text(item.status.toUpperCase(), 480, currentY).fillColor('black');
+            // Warna Status
+            const stat = item.status.toUpperCase();
+            if (stat === 'HADIR') {
+                totalHadir++;
+                doc.fillColor('#059669').text(stat, 450, currentY, { lineBreak: false }).fillColor('black');
+            } else if (stat === 'TERLAMBAT') {
+                totalHadir++;
+                doc.fillColor('#d97706').text(stat, 450, currentY, { lineBreak: false }).fillColor('black');
             } else {
-                doc.fillColor('red').text(item.status.toUpperCase(), 480, currentY).fillColor('black');
+                doc.fillColor('#e11d48').text(stat, 450, currentY, { lineBreak: false }).fillColor('black');
             }
 
             currentY += 20;
@@ -128,7 +147,7 @@ exports.exportPDF = async (req, res) => {
 
         doc.moveTo(50, currentY).lineTo(545, currentY).stroke();
         doc.moveDown();
-        doc.fontSize(10).font('Helvetica-Oblique').text(`Total Kehadiran: ${data.length} Mahasiswa`, { align: 'right' });
+        doc.fontSize(10).font('Helvetica-Bold').text(`Total Kehadiran: ${totalHadir} dari ${data.length} Mahasiswa`, { align: 'right' });
 
         doc.end();
 
@@ -417,6 +436,22 @@ exports.updateDailyReportStatus = async (req, res) => {
         }
 
         res.json({ status: 'success', message: 'Status laporan harian diperbarui' });
+    } catch (err) {
+        res.status(500).json({ status: 'error', message: err.message });
+    }
+};
+
+exports.createSystemReport = async (req, res) => {
+    try {
+        const { message } = req.body;
+        const user_id = req.userId;
+        const [user] = await db.query('SELECT role FROM pengguna WHERE id_user = ?', [user_id]);
+        const role = user.length > 0 ? user[0].role : 'unknown';
+        await db.query(
+            'INSERT INTO reports (sender_user_id, sender_role, title, description, category, status) VALUES (?, ?, ?, ?, ?, ?)',
+            [user_id, role, 'Laporan Masalah Sistem', message, 'SYSTEM_ISSUE', 'PENDING']
+        );
+        res.json({ status: 'success', message: 'Laporan berhasil dikirim' });
     } catch (err) {
         res.status(500).json({ status: 'error', message: err.message });
     }

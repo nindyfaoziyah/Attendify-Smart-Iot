@@ -379,7 +379,7 @@ const confirmLogout = () => {
               <View style={styles.statsGrid}>
                 <StatItem label="Spoof Attempts" value={aiHealth.spoofAttempts} icon={ShieldAlert} color="#EF4444" />
                 <StatItem label="Unknown Faces" value={aiHealth.unknownFaces} icon={EyeOff} color="#F59E0B" />
-                <StatItem label="Avg Confidence" value={aiHealth.averageSuspiciousConfidence + "%"} icon={BrainCircuit} color="#10B981" />
+                <StatItem label="Avg Confidence" value={!isNaN(parseFloat(aiHealth.averageSuspiciousConfidence)) ? (parseFloat(aiHealth.averageSuspiciousConfidence) * 100).toFixed(0) + "%" : "0%"} icon={BrainCircuit} color="#10B981" />
               </View>
 
               {suspiciousLogs.length > 0 && (
@@ -390,7 +390,7 @@ const confirmLogout = () => {
                       <AlertTriangle size={18} color="#EF4444" />
                       <View style={{ flex: 1 }}>
                         <Text style={[styles.logTitle, { color: tokens.textColor }]}>{log.event_type.replace('_', ' ')}</Text>
-                        <Text style={[styles.logSub, { color: tokens.subTextColor }]}>{log.notes || `Confidence: ${log.confidence}%`}</Text>
+                        <Text style={[styles.logSub, { color: tokens.subTextColor }]}>{log.notes || `Confidence: ${!isNaN(parseFloat(log.confidence)) ? (parseFloat(log.confidence) * 100).toFixed(0) : 0}%`}</Text>
                       </View>
                     </BlurView>
                   ))}
@@ -417,7 +417,7 @@ const confirmLogout = () => {
             />
           </View>
 
-          <Text style={[styles.sectionTitle, { color: tokens.textColor }]}>IoT & Monitoring Panel</Text>
+          <Text style={[styles.sectionTitle, { color: tokens.textColor, marginTop: 24 }]}>IoT & Monitoring Panel</Text>
           <View style={styles.menuContainer}>
             <AdminCard 
               title="IoT Unified Sensor" 

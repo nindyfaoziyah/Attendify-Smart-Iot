@@ -4,7 +4,7 @@ exports.getAllJadwal = async (req, res) => {
 
     try {
 
-        const { dosen_id } = req.query;
+        const { dosen_id, hari } = req.query;
 
         let query = `
             SELECT 
@@ -53,15 +53,22 @@ exports.getAllJadwal = async (req, res) => {
 
         let params = [];
 
+        let whereClauses = [];
+
         // FILTER BERDASARKAN DOSEN LOGIN
-
         if (dosen_id) {
-
-            query += `
-                WHERE jadwal_kuliah.dosen_id = ?
-            `;
-
+            whereClauses.push('jadwal_kuliah.dosen_id = ?');
             params.push(dosen_id);
+        }
+
+        // FILTER BERDASARKAN HARI
+        if (hari) {
+            whereClauses.push('jadwal_kuliah.hari = ?');
+            params.push(hari.toLowerCase());
+        }
+
+        if (whereClauses.length > 0) {
+            query += '\n            WHERE ' + whereClauses.join(' AND ');
         }
 
         query += `
@@ -86,5 +93,25 @@ exports.getAllJadwal = async (req, res) => {
             status: 'error',
             message: error.message,
         });
+    }
+};
+
+exports.createJadwal = async (req, res) => {
+    try {
+        const { dosen_id, mata_kuliah_id, kelas_id, hari, jam_mulai, jam_selesai, ruang } = req.body;
+        
+        if (!dosen_id || !mata_kuliah_id || !kelas_id || !hari || !jam_mulai || !jam_selesai) {
+            return res.status(400).json({ status: 'error', message: 'Semua field (dosen, matkul, kelas, hari, jam) wajib diisi.' });
+        }
+
+        const [result] = await db.query(
+            'INSERT INTO jadwal_kuliah (dosen_id, mata_kuliah_id, kelas_id, hari, jam_mulai, jam_selesai, ruang) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [dosen_id, mata_kuliah_id, kelas_id, hari, jam_mulai, jam_selesai, ruang || 'Ruang Dummy']
+        );
+
+        res.json({ status: 'success', message: 'Jadwal berhasil ditambahkan', data: { insertId: result.insertId } });
+    } catch (error) {
+        console.error('Error create jadwal:', error);
+        res.status(500).json({ status: 'error', message: error.message });
     }
 };

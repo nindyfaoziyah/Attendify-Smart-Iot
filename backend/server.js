@@ -43,7 +43,7 @@ app.use('/api/auth/', limiter); // Apply specifically to auth routes for securit
 // Middleware
 const corsOptions = {
     origin: process.env.CORS_ORIGIN || '*',
-    methods: ['GET', 'POST'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
     credentials: true
 };
 app.use(cors(corsOptions));
@@ -66,6 +66,17 @@ app.use('/api', apiRoutes);
 app.use('/api/analytics', analyticsRoutes);
 
 const PORT = process.env.PORT || 5000;
+
+server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+        console.error(`\n❌ Port ${PORT} sudah digunakan oleh proses lain!`);
+        console.error(`   Jalankan perintah berikut untuk mematikannya:\n`);
+        console.error(`   Get-NetTCPConnection -LocalPort ${PORT} -State Listen | ForEach-Object { taskkill /PID $_.OwningProcess /F }\n`);
+        process.exit(1);
+    } else {
+        throw err;
+    }
+});
 
 server.listen(PORT, '0.0.0.0', () => {
     // Get local network IP dynamically

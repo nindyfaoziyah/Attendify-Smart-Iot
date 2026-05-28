@@ -81,11 +81,11 @@ export default function NotificationScreen() {
         if (reportResult.status === 'success') {
           const reports = reportResult.data.map((r: any) => ({
             id: `report_${r.id}`,
-            title: `Laporan: ${r.user_name || 'Pengguna'} (${r.role})`,
-            message: r.message,
+            title: `Laporan: ${r.sender_name || 'Sistem'} (${r.sender_role || 'User'})`,
+            message: r.description || r.title,
             time: r.created_at,
             type: 'warning',
-            read: r.status !== 'pending',
+            read: r.status !== 'PENDING',
             isReport: true
           }));
           allNotifs = [...allNotifs, ...reports];
@@ -191,25 +191,55 @@ export default function NotificationScreen() {
     }
   };
 
-  const handleMarkAsRead = async (id?: number | string) => {
+  const handlePressNotification = async (item?: Notification) => {
     try {
-      if (typeof id === 'string' && id.startsWith('report_')) {
-        // Here we could add an endpoint to mark report as read/resolved
-        // For now, we'll just optimistically update the UI
-        setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+      if (!item) {
+        // Mark all as read logic
+        const token = await AsyncStorage.getItem('@attendify_auth_token');
+        await fetch(`${API_URL}/notifikasi/read`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ id_notif: null }) // assuming backend supports mark all
+        });
+        fetchNotifications();
         return;
       }
 
-      const token = await AsyncStorage.getItem('@attendify_auth_token');
-      await fetch(`${API_URL}/notifikasi/read`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ id_notif: id })
-      });
-      fetchNotifications();
+      const id = item.id;
+      
+      // Navigate based on item type
+      const navigateToTarget = () => {
+        if (item.isReport || item.type === 'NEW_REPORT') {
+          if (role === 'admin') navigation.navigate('AdminReports', { tab: 'facility' });
+        } else if (item.type === 'DAILY_REPORT' || item.title.includes('Harian')) {
+          if (role === 'admin') navigation.navigate('AdminReports', { tab: 'daily' });
+          else if (role === 'dosen') navigation.navigate('DosenDailyReport');
+        }
+      };
+
+      if (typeof id === 'string' && id.startsWith('report_')) {
+        setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+        navigateToTarget();
+        return;
+      }
+
+      if (!item.read) {
+        const token = await AsyncStorage.getItem('@attendify_auth_token');
+        await fetch(`${API_URL}/notifikasi/read`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ id_notif: id })
+        });
+        fetchNotifications();
+      }
+      
+      navigateToTarget();
     } catch (err) {
       console.error('Mark as read error:', err);
     }
@@ -246,7 +276,7 @@ export default function NotificationScreen() {
             </Text>
           </View>
           {unreadCount > 0 && (
-            <TouchableOpacity onPress={() => handleMarkAsRead()}>
+            <TouchableOpacity onPress={() => handlePressNotification()}>
               <Text style={styles.readAllText}>Baca Semua</Text>
             </TouchableOpacity>
           )}
@@ -276,7 +306,7 @@ export default function NotificationScreen() {
                 >
                   <TouchableOpacity
                     activeOpacity={0.7}
-                    onPress={() => handleMarkAsRead(item.id)}
+                    onPress={() => handlePressNotification(item)}
                     style={styles.notificationContent}
                   >
                     <View

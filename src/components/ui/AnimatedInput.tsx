@@ -1,7 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import {
   TextInput, View, StyleSheet, ViewStyle,
-  TextInputProps, Animated, Platform, Text
+  TextInputProps, Animated, Platform, Text, TouchableOpacity
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { DesignSystem } from '../../../constants/DesignSystem';
@@ -15,6 +15,8 @@ interface AnimatedInputProps extends TextInputProps {
   error?: string;
   containerStyle?: ViewStyle;
   floatingLabel?: boolean;
+  rightIcon?: LucideIcon;
+  onRightIconPress?: () => void;
 }
 
 export const AnimatedInput: React.FC<AnimatedInputProps> = ({
@@ -31,6 +33,26 @@ export const AnimatedInput: React.FC<AnimatedInputProps> = ({
   const glowAnim = useRef(new Animated.Value(0)).current;
   const [isFocused, setIsFocused] = React.useState(false);
   const [hasValue, setHasValue] = React.useState(false);
+
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      const styleId = 'animated-input-autofill-fix';
+      if (!document.getElementById(styleId)) {
+        const style = document.createElement('style');
+        style.id = styleId;
+        style.innerHTML = `
+          input:-webkit-autofill,
+          input:-webkit-autofill:hover, 
+          input:-webkit-autofill:focus, 
+          input:-webkit-autofill:active {
+            transition: background-color 5000s ease-in-out 0s !important;
+            -webkit-text-fill-color: white !important;
+          }
+        `;
+        document.head.appendChild(style);
+      }
+    }
+  }, []);
 
   const handleFocus = () => {
     setIsFocused(true);
@@ -112,7 +134,12 @@ export const AnimatedInput: React.FC<AnimatedInputProps> = ({
               placeholderTextColor={tokens.labelColor}
               style={[
                 styles.input,
-                { paddingLeft: Icon ? 40 : 16, color: tokens.textColor },
+                { 
+                  paddingLeft: Icon ? 40 : 16, 
+                  paddingRight: props.rightIcon ? 44 : 16, 
+                  color: tokens.textColor,
+                  ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {})
+                } as any,
               ]}
               onFocus={handleFocus}
               onBlur={handleBlur}
@@ -123,6 +150,14 @@ export const AnimatedInput: React.FC<AnimatedInputProps> = ({
               secureTextEntry={props.secureTextEntry}
               editable={props.editable !== false}
             />
+            {props.rightIcon && (() => {
+              const RightIcon = props.rightIcon;
+              return (
+                <TouchableOpacity onPress={props.onRightIconPress} style={styles.rightIconContainer}>
+                  <RightIcon size={20} color={tokens.subTextColor} />
+                </TouchableOpacity>
+              );
+            })()}
           </View>
         </BlurView>
       </Animated.View>
@@ -182,12 +217,20 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 12,
   },
+  rightIconContainer: {
+    position: 'absolute',
+    right: 12,
+    padding: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   input: {
     flex: 1,
     fontSize: DesignSystem.typography.body,
     color: '#FFF',
     fontWeight: '500',
     paddingVertical: 0,
+    backgroundColor: 'transparent',
   },
   errorText: {
     fontSize: DesignSystem.typography.caption,

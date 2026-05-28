@@ -89,9 +89,6 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
 
     setIsLoading(true);
     try {
-      // Use centralized API_URL
-      // Use centralized API_URL from Config.ts
-
       console.log('Attempting login via backend:', `${API_URL}/login`);
 
       const response = await fetch(`${API_URL}/login`, {
@@ -100,7 +97,7 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          email: identifier.trim(), // Backend handles this as email or username
+          email: identifier.trim(),
           password: password,
         }),
       });
@@ -121,6 +118,7 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
         }
         
         login(userData.role, {
+          id: userData.id,
           fullName: userData.name,
           email: userData.email,
           nim: userData.username || (role === 'mahasiswa' ? identifier : undefined),
@@ -141,7 +139,6 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
 
         console.log('✅ Login successful via backend');
       } else {
-        setIsLoading(false);
         if (response.status === 404) {
           showAlert('Belum Terdaftar', 'Akun belum terdaftar di sistem. Silakan hubungi admin.');
         } else if (response.status === 401) {
@@ -152,10 +149,10 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
       }
     } catch (error) {
       console.error('Login error:', error);
-      setIsLoading(false);
       showAlert('Kesalahan', 'Gagal terhubung ke server. Pastikan backend berjalan dan periksa koneksi internet Anda.');
     } finally {
-      // Loading state is handled in logic
+      // Selalu reset loading state agar input tidak frozen
+      setIsLoading(false);
     }
   };
 
@@ -232,6 +229,8 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
                 onChangeText={setPassword}
                 secureTextEntry={!showPassword}
                 editable={!isLoading}
+                rightIcon={showPassword ? EyeOff : Eye}
+                onRightIconPress={() => setShowPassword(!showPassword)}
               />
             </View>
 

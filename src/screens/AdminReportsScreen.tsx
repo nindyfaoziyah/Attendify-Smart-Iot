@@ -2,14 +2,14 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList,
   TouchableOpacity, StatusBar, ActivityIndicator,
-  RefreshControl, Dimensions, Alert
+  RefreshControl, Dimensions, Alert, Platform
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { 
   ChevronLeft, AlertTriangle, User,
   Clock, CheckCircle, CheckCircle2, MessageSquare, XCircle
 } from 'lucide-react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { BlurView } from 'expo-blur';
 import { Colors } from '@/constants/Colors';
 import { API_URL } from '@/constants/Config';
@@ -41,6 +41,7 @@ interface ReportEntry {
 
 export default function AdminReportsScreen() {
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
   const { tokens, isLightTheme } = useTheme();
   const [reports, setReports] = useState<ReportEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -50,6 +51,12 @@ export default function AdminReportsScreen() {
   const { socket } = useSocket();
   const [activeTab, setActiveTab] = useState<'facility' | 'daily'>('facility');
   const [rejectReason, setRejectReason] = useState('');
+
+  useEffect(() => {
+    if (route.params?.tab) {
+      setActiveTab(route.params.tab);
+    }
+  }, [route.params?.tab]);
 
   const fetchReports = async () => {
     try {
@@ -69,6 +76,7 @@ export default function AdminReportsScreen() {
           message: activeTab === 'facility' ? item.description : item.notes,
           role: activeTab === 'facility' ? item.sender_role : 'dosen',
           user_name: activeTab === 'facility' ? item.sender_name : item.dosen_name,
+          approval_status: item.approval_status || item.status,
         }));
         setReports(mappedData);
         setError(null);
@@ -122,13 +130,16 @@ export default function AdminReportsScreen() {
       
       const result = await response.json();
       if (result.status === 'success') {
-        Alert.alert('Sukses', 'Status laporan berhasil diperbarui');
+        if (Platform.OS !== 'web') Alert.alert('Sukses', 'Status laporan berhasil diperbarui');
+        else window.alert('Status laporan berhasil diperbarui');
         fetchReports(); // Refresh data
       } else {
-        Alert.alert('Error', result.message || 'Gagal mengubah status');
+        if (Platform.OS !== 'web') Alert.alert('Error', result.message || 'Gagal mengubah status');
+        else window.alert(result.message || 'Gagal mengubah status');
       }
     } catch (error) {
-      Alert.alert('Error', 'Terjadi kesalahan jaringan');
+      if (Platform.OS !== 'web') Alert.alert('Error', 'Terjadi kesalahan jaringan');
+      else window.alert('Terjadi kesalahan jaringan');
     }
   };
 
@@ -190,14 +201,20 @@ export default function AdminReportsScreen() {
               <TouchableOpacity 
                 style={[styles.resolveButton, { flex: 1, borderColor: 'rgba(16, 185, 129, 0.3)', backgroundColor: 'rgba(16, 185, 129, 0.1)' }]} 
                 onPress={() => {
-                  Alert.alert(
-                    'Konfirmasi',
-                    'Tandai laporan ini sebagai Disetujui?',
-                    [
-                      { text: 'Batal', style: 'cancel' },
-                      { text: 'Setujui', onPress: () => handleApproval(item.id, 'APPROVED') }
-                    ]
-                  );
+                  if (Platform.OS === 'web') {
+                    if (window.confirm('Tandai laporan ini sebagai Disetujui?')) {
+                      handleApproval(item.id, 'APPROVED');
+                    }
+                  } else {
+                    Alert.alert(
+                      'Konfirmasi',
+                      'Tandai laporan ini sebagai Disetujui?',
+                      [
+                        { text: 'Batal', style: 'cancel' },
+                        { text: 'Setujui', onPress: () => handleApproval(item.id, 'APPROVED') }
+                      ]
+                    );
+                  }
                 }}
               >
                 <CheckCircle2 size={18} color="#10B981" />
@@ -207,15 +224,22 @@ export default function AdminReportsScreen() {
               <TouchableOpacity 
                 style={[styles.resolveButton, { flex: 1, borderColor: 'rgba(239, 68, 68, 0.3)', backgroundColor: 'rgba(239, 68, 68, 0.1)' }]} 
                 onPress={() => {
-                  Alert.prompt(
-                    'Tolak Laporan',
-                    'Masukkan alasan penolakan:',
-                    [
-                      { text: 'Batal', style: 'cancel' },
-                      { text: 'Tolak', onPress: (reason?: string) => handleApproval(item.id, 'REJECTED', reason) }
-                    ],
-                    'plain-text'
-                  );
+                  if (Platform.OS === 'web') {
+                    const reason = window.prompt('Masukkan alasan penolakan:');
+                    if (reason !== null) {
+                      handleApproval(item.id, 'REJECTED', reason);
+                    }
+                  } else {
+                    Alert.prompt(
+                      'Tolak Laporan',
+                      'Masukkan alasan penolakan:',
+                      [
+                        { text: 'Batal', style: 'cancel' },
+                        { text: 'Tolak', onPress: (reason?: string) => handleApproval(item.id, 'REJECTED', reason) }
+                      ],
+                      'plain-text'
+                    );
+                  }
                 }}
               >
                 <XCircle size={18} color="#EF4444" />
@@ -252,13 +276,13 @@ export default function AdminReportsScreen() {
           style={[styles.tab, activeTab === 'facility' && styles.activeTab, activeTab === 'facility' && { borderBottomColor: Colors.ai.primary }]}
           onPress={() => setActiveTab('facility')}
         >
-          <Text style={[styles.tabText, { color: activeTab === 'facility' ? Colors.ai.primary : tokens.subTextColor }]}>Masalah Fasilitas</Text>
+          <Text style={[styles.tabText, { color: activeTab === 'facility' ? Colors.ai.primary : 'rgba(255, 255, 255, 0.6)' }]}>Masalah Fasilitas</Text>
         </TouchableOpacity>
         <TouchableOpacity 
           style={[styles.tab, activeTab === 'daily' && styles.activeTab, activeTab === 'daily' && { borderBottomColor: Colors.ai.primary }]}
           onPress={() => setActiveTab('daily')}
         >
-          <Text style={[styles.tabText, { color: activeTab === 'daily' ? Colors.ai.primary : tokens.subTextColor }]}>Harian Dosen</Text>
+          <Text style={[styles.tabText, { color: activeTab === 'daily' ? Colors.ai.primary : 'rgba(255, 255, 255, 0.6)' }]}>Harian Dosen</Text>
         </TouchableOpacity>
       </View>
 

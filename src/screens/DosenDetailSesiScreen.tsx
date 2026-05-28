@@ -5,7 +5,8 @@ import { useTheme } from '../context/ThemeContext';
 import { useSocket } from '../context/SocketContext';
 import AnimatedBackground from '../components/ui/AnimatedBackground';
 import { BlurView } from 'expo-blur';
-import { ArrowLeft, Clock, FileDown, FileSpreadsheet, Scan, MessageSquare, CheckSquare, Users, AlertTriangle, CheckCircle } from 'lucide-react-native';
+import { ArrowLeft, Clock, FileDown, FileSpreadsheet, MessageSquare, Users, AlertTriangle, CheckCircle, ShieldCheck, ShieldOff } from 'lucide-react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_URL } from '../../constants/Config';
 
 export default function DosenDetailSesiScreen() {
@@ -17,6 +18,7 @@ export default function DosenDetailSesiScreen() {
   const { scheduleItem } = route.params || { scheduleItem: { id: 1, subject: 'Pemrograman Web 2', class_name: 'IF-4A', ruang: 'Lab Komputer 1' } };
 
   const [students, setStudents] = useState<any[]>([]);
+  const [isGrantingAll, setIsGrantingAll] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [sessionDuration, setSessionDuration] = useState(15);
   const [isConfirmVisible, setIsConfirmVisible] = useState(false);
@@ -55,20 +57,21 @@ export default function DosenDetailSesiScreen() {
       const data = await response.json();
       if (data?.students && Array.isArray(data.students)) {
         const formatted = data.students.map((student: any, index: number) => ({
-          id: student.id || student.user_id || index, 
+          id: student.id_user || student.id || student.user_id || index, 
           name: student.nama || "Unknown", 
           status: 'BELUM HADIR',
-          nomor_ortu: student.no_wa_ortu || "6285775607738", 
+          nomor_ortu: student.no_wa_ortu || "6285775607738",
+          scanPermission: !!student.scanPermission,
         }));
         setStudents(formatted);
       }
     } catch (error) { 
       setStudents([
-        { id: '1', name: 'Rian Hidayat', status: 'BELUM HADIR', nomor_ortu: '6281234567890' },
-        { id: '2', name: 'Lestari Putri', status: 'BELUM HADIR', nomor_ortu: '6281234567891' },
-        { id: '3', name: 'Andi Wijaya', status: 'HADIR', nomor_ortu: '6281234567892' },
-        { id: '4', name: 'Dewi Lestari', status: 'BELUM HADIR', nomor_ortu: '6281234567893' },
-        { id: '5', name: 'Bambang Pamungkas', status: 'BELUM HADIR', nomor_ortu: '6281234567894' },
+        { id: '6', name: 'Rian Hidayat', status: 'BELUM HADIR', nomor_ortu: '6281234567890', scanPermission: false },
+        { id: '7', name: 'Lestari Putri', status: 'BELUM HADIR', nomor_ortu: '6281234567891', scanPermission: false },
+        { id: '8', name: 'Andi Wijaya', status: 'HADIR', nomor_ortu: '6281234567892', scanPermission: false },
+        { id: '9', name: 'Dewi Lestari', status: 'BELUM HADIR', nomor_ortu: '6281234567893', scanPermission: false },
+        { id: '10', name: 'Bambang Pamungkas', status: 'BELUM HADIR', nomor_ortu: '6281234567894', scanPermission: false },
       ]);
     }
   };
@@ -97,42 +100,116 @@ export default function DosenDetailSesiScreen() {
     }
   };
 
-  // 🔴 PERBAIKAN LOGIKA TOMBOL SCAN (SEKARANG BISA AKTIF TERUS DAN DIHENTIKAN MANUAL)
-  const fetchRealtimeScan = async () => {
-    // Jika tombol sedang aktif (merah), maka matikan pemindaian saat diklik
-    if (isScanning) {
-      setIsScanning(false);
-      showToast("🛑 Pemindaian IoT dihentikan oleh Dosen.");
-      return;
-    }
-
-    // Jika sedang mati (biru), maka mulai pemindaian
-    try {
-      setIsScanning(true);
-      showToast("📡 Mengaktifkan sensor kamera IoT...");
-      
-      const response = await fetch(`${API_URL}/iot/trigger-scan`, { 
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jadwal_id: scheduleItem.id })
-      });
-      const data = await response.json();
-      
-      // Catatan: isScanning TIDAK LAGI DI-FALSE-KAN DISINI. Biarkan tombol tetap menyala.
-      if (data.status === 'success') {
-        showToast("📸 Kamera kelas aktif! Silakan mahasiswa menghadap ke sensor...");
-      } else if (data.status === 'simulation') {
-        showToast("💡 Alat fisik terputus. Menjalankan mode uji coba simulasi...");
-      }
-    } catch (error) {
-      setIsScanning(false);
-      showToast("❌ Gagal terhubung ke gateway server.");
+  // Toggle izin scan manual untuk semua mahasiswa
+  const toggleManualScanAll = async () => {
+    if (isGrantingAll) return;
+    
+    // Jika ada minimal satu yang punya permission, kita anggap sedang aktif dan mau dinonaktifkan
+    const hasActivePermission = students.some(s => s.scanPermission);
+    
+    if (hasActivePermission) {
+      // Nonaktifkan di database
+      await disableAllScan();
+    } else {
+      // Aktifkan
+      await allowAllScan();
     }
   };
 
-  const allowManualScan = (studentId: any, studentName: string) => {
-    setStudents(prev => prev.map(s => String(s.id) === String(studentId) ? { ...s, status: 'HADIR' } : s));
-    showToast(`🔹 Status ${studentName} diubah menjadi HADIR secara manual.`);
+  // Matikan izin scan manual untuk semua mahasiswa di database
+  const disableAllScan = async () => {
+    setIsGrantingAll(true);
+    try {
+      const token = await AsyncStorage.getItem('@attendify_auth_token');
+      let count = 0;
+      for (const student of students) {
+        // Hapus pengecekan lokal (!student.scanPermission) agar backend dipaksa mematikan semua
+        try {
+          const res = await fetch(`${API_URL}/manual-scan/disable`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ user_id: student.id }),
+          });
+          const d = await res.json();
+          if (d.status === 'success') count++;
+        } catch {}
+      }
+      setStudents(prev => prev.map(s => ({ ...s, scanPermission: false })));
+      showToast('🛑 Scan manual mahasiswa dinonaktifkan.');
+    } catch (error) {
+      showToast('❌ Gagal menonaktifkan scan manual');
+    } finally {
+      setIsGrantingAll(false);
+    }
+  };  // Izinkan mahasiswa tertentu untuk scan manual (memanggil API real)
+  // Toggle izin scan manual untuk satu mahasiswa tertentu (memanggil API real)
+  const toggleIndividualScan = async (studentId: any, studentName: string, currentlyAllowed: boolean) => {
+    try {
+      const token = await AsyncStorage.getItem('@attendify_auth_token');
+      const endpoint = currentlyAllowed ? `${API_URL}/manual-scan/disable` : `${API_URL}/manual-scan/allow`;
+      
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ user_id: studentId }),
+      });
+      const data = await response.json();
+      if (data.status === 'success') {
+        setStudents(prev => prev.map(s =>
+          String(s.id) === String(studentId) ? { ...s, scanPermission: !currentlyAllowed } : s
+        ));
+        showToast(currentlyAllowed 
+          ? `🛑 Izin scan dicabut untuk ${studentName}`
+          : `✅ Izin scan diberikan ke ${studentName} (5 menit)`
+        );
+      } else {
+        showToast(`❌ Gagal: ${data.message || 'Tidak dapat memproses'}`);
+      }
+    } catch (error) {
+      showToast(`❌ Error: Gagal terhubung ke server`);
+    }
+  };
+
+  // Izinkan semua mahasiswa yang belum hadir untuk scan manual
+  const allowAllScan = async () => {
+    const belumHadir = students.filter(s => s.status !== 'HADIR');
+    if (belumHadir.length === 0) {
+      showToast('✅ Semua mahasiswa sudah hadir!');
+      return;
+    }
+    setIsGrantingAll(true);
+    try {
+      const token = await AsyncStorage.getItem('@attendify_auth_token');
+      let count = 0;
+      for (const student of belumHadir) {
+        try {
+          const res = await fetch(`${API_URL}/manual-scan/allow`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ user_id: student.id }),
+          });
+          const d = await res.json();
+          if (d.status === 'success') count++;
+        } catch {}
+      }
+      setStudents(prev => prev.map(s =>
+        s.status !== 'HADIR' ? { ...s, scanPermission: true } : s
+      ));
+      showToast(`✅ Izin scan diberikan ke ${count}/${belumHadir.length} mahasiswa (5 menit)`);
+    } catch (error) {
+      showToast('❌ Gagal memberi izin ke semua mahasiswa');
+    } finally {
+      setIsGrantingAll(false);
+    }
   };
 
   const sendIndividualReport = (student: any) => {
@@ -206,20 +283,24 @@ Terima kasih atas perhatian Anda.`;
               <Text style={styles.timerText}>Durasi Sesi Berjalan: <Text style={{fontWeight: 'bold', color: '#60A5FA'}}>{sessionDuration}s</Text></Text>
             </View>
 
-            {/* 🔴 PERBAIKAN TAMPILAN TOMBOL SCAN */}
+            {/* Tombol utama: Izinkan Semua Scan Manual */}
             <TouchableOpacity 
               style={[
                 styles.primaryScanButton, 
-                isScanning && { backgroundColor: '#EF4444', shadowColor: '#EF4444' } // Tombol jadi merah saat aktif
+                students.some(s => s.scanPermission) && { backgroundColor: '#EF4444', shadowColor: '#EF4444' }
               ]} 
-              onPress={fetchRealtimeScan}
+              onPress={toggleManualScanAll}
+              disabled={isGrantingAll}
             >
-              <Scan size={20} color="#FFFFFF" />
+              <ShieldCheck size={20} color="#FFFFFF" />
               <Text style={styles.primaryScanButtonText}>
-                {isScanning ? 'Hentikan Pemindaian' : 'Trigger IoT Scan'}
+                {isGrantingAll
+                  ? 'Memproses...'
+                  : students.some(s => s.scanPermission)
+                  ? 'Nonaktifkan Scan Manual (Semua)'
+                  : 'Izinkan Scan Manual (Semua)'}
               </Text>
             </TouchableOpacity>
-
             <View style={styles.exportSection}>
               <Text style={styles.sectionSubHeading}>Unduh Dokumen Berkas</Text>
               <View style={styles.exportGrid}>
@@ -264,12 +345,22 @@ Terima kasih atas perhatian Anda.`;
                     <MessageSquare size={18} color="#34D399" />
                   </TouchableOpacity>
                   
+                  {/* Tombol Izinkan Scan Manual per-mahasiswa */}
                   <TouchableOpacity 
-                    onPress={() => allowManualScan(student.id, student.name)} 
+                    onPress={() => toggleIndividualScan(student.id, student.name, !!student.scanPermission)} 
                     disabled={isHadir}
-                    style={[styles.iconButtonWrapper, { backgroundColor: 'rgba(59, 130, 246, 0.12)' }, isHadir && { opacity: 0.25 }]}
+                    style={[
+                      styles.iconButtonWrapper,
+                      student.scanPermission
+                        ? { backgroundColor: 'rgba(16, 185, 129, 0.2)', borderWidth: 1, borderColor: 'rgba(16,185,129,0.4)' }
+                        : { backgroundColor: 'rgba(59, 130, 246, 0.12)' },
+                      isHadir && { opacity: 0.25 }
+                    ]}
                   >
-                    <CheckSquare size={18} color="#60A5FA" />
+                    {student.scanPermission
+                      ? <ShieldCheck size={18} color="#10B981" />
+                      : <ShieldOff size={18} color="#60A5FA" />
+                    }
                   </TouchableOpacity>
                 </View>
               </View>
@@ -322,6 +413,8 @@ const styles = StyleSheet.create({
   timerText: { color: '#CBD5E1', fontSize: 13 },
   primaryScanButton: { backgroundColor: '#2563EB', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 14, borderRadius: 16, marginTop: 20, shadowColor: '#2563EB', shadowOpacity: 0.3, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } },
   primaryScanButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
+  allowAllButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 13, borderRadius: 16, marginTop: 10, backgroundColor: 'rgba(16, 185, 129, 0.1)', borderWidth: 1, borderColor: 'rgba(16, 185, 129, 0.3)' },
+  allowAllButtonText: { color: '#10B981', fontSize: 14, fontWeight: '700' },
   exportSection: { marginTop: 22, borderTopWidth: 1, borderColor: 'rgba(255,255,255,0.06)', paddingTop: 15 },
   sectionSubHeading: { color: '#64748B', fontSize: 12, fontWeight: '600', textTransform: 'uppercase', marginBottom: 10, letterSpacing: 0.5 },
   exportGrid: { flexDirection: 'row', gap: 12 },

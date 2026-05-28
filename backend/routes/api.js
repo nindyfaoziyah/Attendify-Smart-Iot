@@ -17,6 +17,7 @@ const roleCheck = require('../middleware/roleCheck');
 const authCtrl = require('../controllers/authController');
 const userCtrl = require('../controllers/userController');
 const jadwalCtrl = require('../controllers/jadwalController');
+const mataKuliahCtrl = require('../controllers/mataKuliahController');
 const absensiCtrl = require('../controllers/absensiController');
 const notifCtrl = require('../controllers/notifikasiController');
 const dashCtrl = require('../controllers/dashboardController');
@@ -54,9 +55,43 @@ router.put('/admin/students/:id', auth, roleCheck('admin'), adminStudentCtrl.upd
 router.delete('/admin/students/:id', auth, roleCheck('admin'), adminStudentCtrl.deleteStudent);
 
 // ======================================================
+// KODE BARU: Endpoint Aktivasi Akun Mahasiswa
+// ======================================================
+router.post('/admin/students/activate', async (req, res) => {
+  try {
+    const { nim } = req.body;
+
+    if (!nim) {
+      return res.status(400).json({ status: 'error', message: 'NIM kosong!' });
+    }
+
+    // MENGGUNAKAN KOLOM YANG BENAR-BENAR ADA DI DATABASEMU
+    // is_face_verified diubah jadi 1, status diubah jadi 'Y'
+    const query = `
+      UPDATE pengguna 
+      SET is_face_verified = 1, status = 'Y' 
+      WHERE nim = ?
+    `;
+    await db.query(query, [nim]);
+
+    return res.status(200).json({
+      status: 'success',
+      message: 'Berhasil diaktifkan!'
+    });
+
+  } catch (error) {
+    console.error('Error Aktivasi:', error);
+    return res.status(500).json({ status: 'error', message: 'Server Error' });
+  }
+});
+
+// ======================================================
 // 3. JADWAL ROUTES
 // ======================================================
 router.get('/jadwal', jadwalCtrl.getAllJadwal);
+router.post('/jadwal', auth, roleCheck('admin'), jadwalCtrl.createJadwal);
+
+router.get('/mata-kuliah', auth, mataKuliahCtrl.getAllMataKuliah);
 
 // ======================================================
 // 4. ABSENSI ROUTES
@@ -76,6 +111,9 @@ router.put('/absensi/:id/validate', auth, roleCheck('dosen', 'admin'), absensiCt
 router.get('/reports/absensi', auth, roleCheck('admin', 'dosen'), reportCtrl.exportAttendance);
 router.get('/reports/excel', reportCtrl.exportExcel);
 router.get('/reports/pdf', reportCtrl.exportPDF);
+
+// System/General Issue Reports
+router.post('/reports', auth, reportCtrl.createSystemReport);
 
 // Mahasiswa Facility/Issue Reports
 router.post('/reports/mahasiswa', auth, roleCheck('mahasiswa'), reportCtrl.createReport);
@@ -107,7 +145,7 @@ router.get('/dashboard/mahasiswa', auth, roleCheck('mahasiswa'), dashCtrl.getMah
 // ======================================================
 router.get('/wajah/available-users', auth, roleCheck('admin'), wajahCtrl.getAvailableUsers);
 router.post('/wajah/start-session', auth, roleCheck('admin'), wajahCtrl.startValidationSession);
-router.get('/wajah/status/:user_id', auth, wajahCtrl.getValidationStatus);
+router.get('/wajah/status/:user_id', wajahCtrl.getValidationStatus);
 router.post('/wajah/iot-capture', wajahCtrl.uploadIotFaceData);
 
 // --- NEW ADMIN FACE MANAGEMENT ---

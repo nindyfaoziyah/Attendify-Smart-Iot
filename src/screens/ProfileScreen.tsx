@@ -33,7 +33,7 @@ export default function ProfileScreen() {
           login(role, {
             fullName: userData.name,
             email: userData.email,
-            nim: userData.username || user?.nim,
+            nim: userData.nim || userData.username || user?.nim,
             prodi: userData.prodi,
             kelas: userData.kelas,
             phone: userData.phone,
@@ -267,7 +267,7 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
 
   scrollContent: {
-    paddingTop: 80,
+    paddingTop: Platform.OS === 'web' ? 40 : 80,
     paddingHorizontal: 20,
     paddingBottom: 100,
   },

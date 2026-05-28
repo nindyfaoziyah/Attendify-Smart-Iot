@@ -8,7 +8,8 @@ import { Colors } from '@/constants/Colors';
 import {
   ArrowLeft, Search, UserPlus, Trash2, 
   Edit3, Filter, X, Check, ShieldCheck, 
-  UserCheck, Briefcase, Mail, Phone, IdCard
+  UserCheck, Briefcase, Mail, Phone, IdCard,
+  Eye, EyeOff
 } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { BlurView } from 'expo-blur';
@@ -31,6 +32,7 @@ export default function ManageLecturersScreen() {
   const [formData, setFormData] = useState({
     name: '', nip: '', jabatan: '', email: '', phone: '', password: ''
   });
+  const [showPassword, setShowPassword] = useState(false);
 
   const fetchLecturers = async () => {
     setIsLoading(true);
@@ -364,16 +366,23 @@ export default function ManageLecturersScreen() {
                           onChangeText={text => setFormData({...formData, password: text})}
                           placeholder="Password untuk dosen ini..."
                           placeholderTextColor={tokens.subTextColor}
-                          secureTextEntry={true}
+                          secureTextEntry={!showPassword}
                         />
+                        <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={{ padding: 8 }}>
+                          {showPassword ? (
+                            <EyeOff size={20} color={tokens.subTextColor} />
+                          ) : (
+                            <Eye size={20} color={tokens.subTextColor} />
+                          )}
+                        </TouchableOpacity>
                       </View>
                     </View>
 
-                    <View style={styles.infoBox}>
-                      <Text style={styles.infoText}>
-                        💡 <Text style={styles.infoTextBold}>Tips Login:</Text> Dosen dapat login menggunakan:
+                    <View style={[styles.infoBox, { backgroundColor: isLightTheme ? 'rgba(167, 139, 250, 0.1)' : 'rgba(167, 139, 250, 0.05)', borderColor: 'rgba(167, 139, 250, 0.3)' }]}>
+                      <Text style={[styles.infoText, { color: isLightTheme ? '#6D28D9' : '#C4B5FD' }]}>
+                        💡 <Text style={[styles.infoTextBold, { color: isLightTheme ? '#5B21B6' : '#A78BFA' }]}>Tips Login:</Text> Dosen dapat login menggunakan:
                         {'\n'}• Email: {formData.email || '(email yang diisi)'}
-                        {'\n'}• NIP (sebagai username): {formData.nip || '(NIP yang diisi)'}
+                        {'\n'}• NIP: {formData.nip || '(NIP yang diisi)'}
                         {'\n'}• Password: (password yang diatur di sini)
                       </Text>
                     </View>
@@ -595,13 +604,13 @@ const styles = StyleSheet.create({
   },
   infoBox: {
     borderRadius: 14,
-    padding: 14,
-    marginBottom: 20,
+    padding: 16,
+    marginBottom: 24,
     borderWidth: 1,
   },
   infoText: {
     fontSize: 13,
-    lineHeight: 20,
+    lineHeight: 22,
   },
   infoTextBold: {
     fontWeight: '600',

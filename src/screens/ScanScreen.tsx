@@ -18,10 +18,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_URL } from '@/constants/Config';
 import { useAuth } from '../context/AuthContext';
 import AnimatedBackground from '../components/ui/AnimatedBackground';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
 
 export default function ScanScreen() {
+  const insets = useSafeAreaInsets();
   const [hasPermission, requestPermission] = useCameraPermissions();
 const cameraRef = useRef<any>(null);
   const [hasManualPermission, setHasManualPermission] = useState(false);
@@ -33,22 +35,33 @@ const cameraRef = useRef<any>(null);
   const scanLineAnim = useRef(new Animated.Value(0)).current;
   const navigation = useNavigation<any>();
   const { isLoggedIn } = useAuth();
+  const [pollCount, setPollCount] = useState(0);
 
   useEffect(() => {
     checkManualPermission();
   }, []);
 
+  // Polling setiap 5 detik untuk mensinkronisasi status izin dari dosen secara real-time
+  useEffect(() => {
+    if (permissionLoading) return;
+    const interval = setInterval(() => {
+      checkManualPermission();
+      setPollCount(prev => prev + 1);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [permissionLoading]);
+
   const checkManualPermission = async () => {
     try {
       const token = await AsyncStorage.getItem('@attendify_auth_token');
       if (token && isLoggedIn) {
-        const response = await fetch(`${API_URL}/manual-scan/permission`, {
+        const response = await fetch(`${API_URL}/manual-scan/permission?_t=${Date.now()}`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
         });
         const data = await response.json();
-        setHasManualPermission(data.data?.enabled || false);
+        setHasManualPermission(!!data.data?.enabled);
       }
     } catch (error) {
       console.log('Permission check error:', error);
@@ -84,11 +97,22 @@ const cameraRef = useRef<any>(null);
   }, [scanning]);
 
   const performScan = async () => {
-    setScanning(false);
     try {
       const token = await AsyncStorage.getItem('@attendify_auth_token');
-      // Mock image for demo - replace with cameraRef.current.takePicture()
-      const imageBase64 = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...'; 
+      
+      let imageBase64 = '';
+      if (cameraRef.current) {
+        // Ambil foto betulan dari kamera HP dengan resolusi rendah agar ringan
+        const photo = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.5 });
+        imageBase64 = photo.base64;
+      }
+
+      if (!imageBase64) {
+        setScanning(false);
+        setResult('failed');
+        alert('Gagal mengambil gambar dari kamera.');
+        return;
+      }
       
       const response = await fetch(`${API_URL}/iot/recognize`, {
         method: 'POST',
@@ -104,6 +128,7 @@ const cameraRef = useRef<any>(null);
       });
 
       const data = await response.json();
+      setScanning(false);
       
       if (data.status === 'matched') {
         setResult('success');
@@ -111,9 +136,12 @@ const cameraRef = useRef<any>(null);
         const now = new Date();
         setScanTime(`${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`);
       } else {
+        console.log('API Failed:', data.message);
         setResult('failed');
       }
     } catch (error) {
+      console.log('Network Error:', error);
+      setScanning(false);
       setResult('failed');
     }
   };
@@ -164,7 +192,7 @@ const cameraRef = useRef<any>(null);
       <CameraView style={styles.camera} facing="front" ref={cameraRef} />
       
       <View style={styles.overlay}>
-        <View style={styles.overlayTop}>
+        <View style={[styles.overlayTop, { paddingTop: Math.max(insets.top, 20) }]}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.closeBtn}>
             <X color="#fff" size={24} />
           </TouchableOpacity>
@@ -210,9 +238,9 @@ const cameraRef = useRef<any>(null);
             <Cpu size={16} color="rgba(59, 130, 246, 0.7)" />
             <Text style={styles.instructionText}>
               {permissionLoading 
-                ? 'Memuat izin manual...' 
+                ? 'Memuat status izin...' 
                 : !hasManualPermission 
-                ? 'Scan Manual Belum Diizinkan Dosen' 
+                ? 'Membutuhkan izin manual dari dosen' 
                 : scanning 
                 ? 'MENGANALISIS WAJAH...' 
                 : 'Posisikan wajah di kotak biru'}
@@ -286,7 +314,7 @@ alert('Izin Diperlukan: Hubungi dosen untuk scan manual');
               <Text style={styles.portalSub}>
                 {result === 'success' 
                   ? `Wajah terdeteksi! Absensi tercatat pukul ${scanTime}` 
-                  : 'Wajah tidak dikenali. Coba lagi dengan pencahayaan baik.'}
+                  : 'Wajah tidak dikenali atau belum terdaftar. Pastikan wajah sudah didaftarkan dan pencahayaan cukup.'}
               </Text>
 
               <TouchableOpacity 
@@ -370,7 +398,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 60,
     paddingHorizontal: 24,
   },
   closeBtn: {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions, Alert, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions, Alert, Image, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '@/constants/Colors';
 import { Camera, Calendar, Clock, MapPin, Bell, CheckCircle2, AlertTriangle } from 'lucide-react-native';
@@ -18,6 +18,7 @@ import StatusBadge from '../components/ui/StatusBadge';
 import RealtimeIndicator from '../components/ui/RealtimeIndicator';
 import * as Location from 'expo-location';
 import { API_URL } from '@/constants/Config';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
 const { width } = Dimensions.get('window');
@@ -96,12 +97,53 @@ export default function HomeScreen() {
     };
   }, [socket, user]);
 
-  // Mock data - replace with real data from backend
-  const attendanceData = [
+  const [attendanceData, setAttendanceData] = useState<any[]>([
     { subject: 'Pemrograman Web', attendance: 85, total: 12, attended: 10 },
     { subject: 'Kecerdasan Buatan', attendance: 92, total: 12, attended: 11 },
     { subject: 'Mobile Programming', attendance: 78, total: 12, attended: 9 },
-  ];
+  ]);
+  const [statsLastUpdated, setStatsLastUpdated] = useState<Date>(new Date());
+
+  const fetchStats = async () => {
+    try {
+      const token = await AsyncStorage.getItem('@attendify_auth_token');
+      const response = await fetch(`${API_URL}/jadwal`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await response.json();
+      if (data.status === 'success' && Array.isArray(data.data)) {
+        let filtered = data.data;
+        if (user && user.kelas) {
+          filtered = data.data.filter((item: any) => 
+            String(item.class_name).toLowerCase() === String(user.kelas).toLowerCase()
+          );
+        }
+        if (filtered.length > 0) {
+          const formatted = filtered.map((item: any) => ({
+            subject: item.subject,
+            attendance: Math.round((item.attended_count / (item.total_students || 1)) * 100),
+            total: item.total_students || 1,
+            attended: item.attended_count || 0,
+          }));
+          setAttendanceData(formatted);
+          setStatsLastUpdated(new Date());
+        }
+      }
+    } catch (error) {
+      console.log('Error fetching stats:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchStats();
+    // Auto-refresh setiap 30 detik
+    const interval = setInterval(() => {
+      fetchStats();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [user]);
 
   const handleScan = () => {
     navigation.navigate('Scan');
@@ -127,9 +169,6 @@ export default function HomeScreen() {
         <View style={styles.headerContainer}>
           <View style={styles.topRow}>
             <View style={styles.greetingBox}>
-              <Text style={[styles.subGreeting, { color: tokens.subTextColor }]}>
-                Mahasiswa {userProdi}
-              </Text>
               <Text style={[styles.greeting, { color: tokens.textColor }]}>
                 Halo, {userName} 👋
               </Text>
@@ -203,21 +242,17 @@ export default function HomeScreen() {
             </View>
             <Text style={[styles.menuLabel, { color: tokens.textColor }]}>Jadwal</Text>
           </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={[styles.menuItem, { backgroundColor: isLightTheme ? 'rgba(30, 79, 168, 0.05)' : 'rgba(255,255,255,0.05)', borderColor: tokens.borderColor }]} 
-            onPress={handleESP32Camera}
-          >
-            <View style={[styles.iconBox, { backgroundColor: 'rgba(244, 114, 182, 0.15)' }]}>
-              <Clock color="#F472B6" size={26} />
-            </View>
-            <Text style={[styles.menuLabel, { color: tokens.textColor }]}>ESP32 Cam</Text>
-          </TouchableOpacity>
         </View>
 
         {/* Attendance Statistics */}
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, { color: tokens.textColor }]}>Statistik Absensi</Text>
+          <View style={styles.liveBadge}>
+            <View style={styles.liveDot} />
+            <Text style={[styles.liveText, { color: '#10B981' }]}>
+              {statsLastUpdated.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+            </Text>
+          </View>
         </View>
 
         <BlurView 
@@ -291,7 +326,7 @@ const styles = StyleSheet.create({
   },
   headerContainer: {
     paddingHorizontal: 20,
-    paddingTop: 60,
+    paddingTop: Platform.OS === 'web' ? 20 : 60,
     paddingBottom: 20,
   },
   topRow: {
@@ -402,7 +437,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   menuItem: {
-    width: (width - 60) / 3,
+    width: (width - 55) / 2,
     alignItems: 'center',
     padding: 16,
     borderRadius: 20,
@@ -424,10 +459,34 @@ const styles = StyleSheet.create({
   sectionHeader: {
     paddingHorizontal: 24,
     marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  liveBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+  },
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#10B981',
+  },
+  liveText: {
+    fontSize: 11,
+    fontWeight: '600',
   },
   chartWrapper: {
     marginHorizontal: 20,
