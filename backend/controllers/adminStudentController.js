@@ -117,16 +117,68 @@ exports.createStudent = async (req, res) => {
  */
 exports.updateStudent = async (req, res) => {
     const { id } = req.params;
-    const { name, nim, email } = req.body;
+    const { name, nim, email, prodi, kelas, password } = req.body;
+
+    const connection = await db.getConnection();
+    await connection.beginTransaction();
 
     try {
-        await db.query(
-            'UPDATE pengguna SET nama = ?, username = ?, email = ? WHERE id_user = ?',
-            [name, nim, email, id]
-        );
+        let updateQuery = 'UPDATE pengguna SET nama = ?, username = ?, email = ?';
+        let queryParams = [name, nim, email];
+
+        if (password && password.trim() !== '') {
+            const bcrypt = require('bcryptjs');
+            const hashedPassword = await bcrypt.hash(password, 10);
+            updateQuery += ', password = ?';
+            queryParams.push(hashedPassword);
+        }
+
+        updateQuery += ' WHERE id_user = ?';
+        queryParams.push(id);
+
+        await connection.query(updateQuery, queryParams);
+
+        // Handle Kelas & Prodi
+        try {
+            if (kelas || prodi) {
+                let classId;
+                const [classRows] = await connection.query('SELECT id_kelas FROM kelas WHERE nama_kelas = ?', [kelas]);
+                
+                if (classRows.length > 0) {
+                    classId = classRows[0].id_kelas;
+                } else {
+                    const [newClass] = await connection.query(
+                        'INSERT INTO kelas (nama_kelas, prodi) VALUES (?, ?)',
+                        [kelas, prodi || '-']
+                    );
+                    classId = newClass.insertId;
+                }
+
+                // Check if mapping exists
+                const [mappingRows] = await connection.query('SELECT * FROM mahasiswa_kelas WHERE mahasiswa_id = ?', [id]);
+                if (mappingRows.length > 0) {
+                    await connection.query(
+                        'UPDATE mahasiswa_kelas SET kelas_id = ? WHERE mahasiswa_id = ?',
+                        [classId, id]
+                    );
+                } else {
+                    await connection.query(
+                        'INSERT INTO mahasiswa_kelas (mahasiswa_id, kelas_id) VALUES (?, ?)',
+                        [id, classId]
+                    );
+                }
+            }
+        } catch (kelasError) {
+            console.log("Info: Tabel kelas/mahasiswa_kelas diabaikan sementara.");
+        }
+
+        await connection.commit();
         res.json({ status: 'success', message: 'Data mahasiswa berhasil diperbarui' });
     } catch (err) {
+        await connection.rollback();
         res.status(500).json({ status: 'error', message: err.message });
+    } finally {
+        connection.release();
     }
 };
 

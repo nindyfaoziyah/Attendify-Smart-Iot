@@ -67,6 +67,15 @@ export default function ManageStudentsScreen({ navigation }: any) {
     ruang: ''
   });
 
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editId, setEditId] = useState<number | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editNim, setEditNim] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editProdi, setEditProdi] = useState('');
+  const [editKelas, setEditKelas] = useState('');
+  const [editPassword, setEditPassword] = useState('');
+
   // Setup Izin Kamera menggunakan Hook bawaan Expo terbaru
   let permission: any = null;
   let requestPermission: any = () => {};
@@ -229,6 +238,46 @@ export default function ManageStudentsScreen({ navigation }: any) {
     } catch (e) {
       console.error(e);
       showNotification('Error', 'Terjadi kesalahan jaringan');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateStudent = async () => {
+    if (!editNim || !editName) {
+      showNotification('Peringatan', 'Mohon lengkapi Nama dan NIM!');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const token = await getAuthToken();
+      const response = await fetch(`${API_URL}/api/admin/students/${editId}`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : '' 
+        },
+        body: JSON.stringify({ 
+          nim: editNim, 
+          name: editName, 
+          email: editEmail,
+          prodi: editProdi,
+          kelas: editKelas,
+          password: editPassword 
+        }),
+      });
+
+      const data = await response.json();
+      if (response.ok || data.status === 'success') {
+        showNotification('Sukses', 'Data mahasiswa berhasil diperbarui!');
+        setEditModalVisible(false);
+        fetchStudents();
+      } else {
+        showNotification('Gagal', data.message || 'Gagal memperbarui mahasiswa.');
+      }
+    } catch (error) {
+      showNotification('Error', 'Terjadi kesalahan koneksi ke server.');
     } finally {
       setLoading(false);
     }
@@ -448,9 +497,23 @@ export default function ManageStudentsScreen({ navigation }: any) {
                       </Text>
                       <Text style={styles.studentDetails}>Prodi: {item.prodi || '-'}</Text>
                     </View>
-                    <TouchableOpacity style={styles.moreOptionsBtn} onPress={() => handleDeleteStudent(item.id as any, item.name)}>
-                       <Ionicons name="trash-outline" size={20} color="#FF4C4C" />
-                    </TouchableOpacity>
+                    <View style={{ flexDirection: 'row', gap: 4 }}>
+                      <TouchableOpacity style={styles.moreOptionsBtn} onPress={() => {
+                        setEditId(item.id as any);
+                        setEditName(item.name);
+                        setEditNim(item.nim);
+                        setEditEmail(item.email || '');
+                        setEditProdi(item.prodi !== '-' ? item.prodi : '');
+                        setEditKelas(item.kelas !== '-' ? item.kelas : '');
+                        setEditPassword('');
+                        setEditModalVisible(true);
+                      }}>
+                        <Ionicons name="pencil-outline" size={20} color="#3B82F6" />
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.moreOptionsBtn} onPress={() => handleDeleteStudent(item.id as any, item.name)}>
+                         <Ionicons name="trash-outline" size={20} color="#FF4C4C" />
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 ))}
               </View>
@@ -674,6 +737,49 @@ export default function ManageStudentsScreen({ navigation }: any) {
               )}
             </ScrollView>
           )}
+        </View>
+      </Modal>
+
+      {/* MODAL EDIT MAHASISWA */}
+      <Modal visible={editModalVisible} animationType="slide" transparent={false}>
+        <View style={styles.fullScreenModalContent}>
+          <View style={styles.modalHeader}>
+            <View>
+              <Text style={styles.modalTitle}>Edit Mahasiswa</Text>
+              <Text style={styles.modalSubtitle}>Perbarui data mahasiswa</Text>
+            </View>
+            <TouchableOpacity onPress={() => setEditModalVisible(false)} style={styles.closeBtn}>
+              <Ionicons name="close" size={22} color="#FFF" />
+            </TouchableOpacity>
+          </View>
+          <ScrollView style={styles.modalFormScroll} showsVerticalScrollIndicator={true} keyboardShouldPersistTaps="handled">
+            <Text style={styles.inputLabel}>NIM</Text>
+            <TextInput style={styles.inputBox} placeholder="Masukkan NIM" placeholderTextColor="#56637A" value={editNim} onChangeText={setEditNim} keyboardType="numeric" autoComplete="off" />
+            
+            <Text style={styles.inputLabel}>Nama Lengkap</Text>
+            <TextInput style={styles.inputBox} placeholder="Masukkan Nama Lengkap" placeholderTextColor="#56637A" value={editName} onChangeText={setEditName} autoComplete="off" />
+
+            <Text style={styles.inputLabel}>Email</Text>
+            <TextInput style={styles.inputBox} placeholder="Masukkan Email" placeholderTextColor="#56637A" value={editEmail} onChangeText={setEditEmail} keyboardType="email-address" autoCapitalize="none" autoComplete="off" />
+
+            <Text style={styles.inputLabel}>Password (Kosongkan jika tidak ingin diubah)</Text>
+            <View style={styles.passwordContainer}>
+              <TextInput style={styles.passwordInput} placeholder="••••••••" placeholderTextColor="#56637A" value={editPassword} onChangeText={setEditPassword} secureTextEntry={!showPassword} autoComplete="off" />
+              <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={20} color="rgba(255,255,255,0.5)" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.inputLabel}>Program Studi (Prodi)</Text>
+            <TextInput style={styles.inputBox} placeholder="Contoh: Informatika" placeholderTextColor="#56637A" value={editProdi} onChangeText={setEditProdi} autoComplete="off" />
+
+            <Text style={styles.inputLabel}>Kelas</Text>
+            <TextInput style={styles.inputBox} placeholder="Contoh: IF-4A" placeholderTextColor="#56637A" value={editKelas} onChangeText={setEditKelas} autoComplete="off" />
+
+            <TouchableOpacity style={styles.primaryBtn} onPress={handleUpdateStudent} disabled={loading}>
+              {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.btnText}>Simpan Perubahan</Text>}
+            </TouchableOpacity>
+          </ScrollView>
         </View>
       </Modal>
     </LinearGradient>
