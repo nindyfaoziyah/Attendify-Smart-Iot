@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '@/constants/Colors';
+import { Ionicons } from '@expo/vector-icons';
 import {
   ArrowLeft, Search, UserPlus, Trash2, 
   Edit3, Filter, X, Check, ShieldCheck, 
@@ -176,9 +177,9 @@ export default function ManageLecturersScreen() {
         <View style={styles.header}>
           <TouchableOpacity 
             onPress={() => navigation.goBack()} 
-            style={[styles.backBtn, { backgroundColor: tokens.iconButtonBg }]}
+            style={{ padding: 8, marginLeft: -8 }}
           >
-            <ArrowLeft color={tokens.textColor} size={24} />
+            <Ionicons name="chevron-back" color={tokens.textColor} size={28} />
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: tokens.textColor }]}>Basis Data Dosen</Text>
           <View style={{ width: 24 }} />
@@ -391,15 +392,9 @@ export default function ManageLecturersScreen() {
 
 
                 <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-                  <LinearGradient
-                    colors={['#A78BFA', '#7C3AED']}
-                    style={styles.saveGradient}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                  >
-                    <Check color="#fff" size={20} />
+                  <View style={[styles.saveGradient, { backgroundColor: '#3B82F6' }]}>
                     <Text style={styles.saveBtnText}>Simpan Data Dosen</Text>
-                  </LinearGradient>
+                  </View>
                 </TouchableOpacity>
               </ScrollView>
             </BlurView>
@@ -606,7 +601,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 16,
     marginBottom: 24,
-    borderWidth: 1,
+    borderWidth: 0,
   },
   infoText: {
     fontSize: 13,

@@ -221,13 +221,13 @@ const confirmLogout = () => {
   );
 
   const StatItem = ({ label, value, icon: Icon, color }: any) => (
-    <BlurView intensity={20} tint={isLightTheme ? 'light' : 'dark'} style={[styles.statCard, { borderColor: tokens.borderColor }]}>
+    <View style={[styles.statCard, { backgroundColor: tokens.cardBg, borderColor: tokens.borderColor }]}>
       <View style={[styles.statIconBox, { backgroundColor: `${color}15` }]}>
         <Icon size={18} color={color} />
       </View>
       <Text style={[styles.statLabel, { color: tokens.subTextColor }]}>{label}</Text>
       <Text style={[styles.statValue, { color: tokens.textColor }]}>{value}</Text>
-    </BlurView>
+    </View>
   );
 
   return (
@@ -267,7 +267,7 @@ const confirmLogout = () => {
           </View>
 
           {/* IoT Status Banner */}
-          <BlurView intensity={30} tint={isLightTheme ? 'light' : 'dark'} style={[styles.statusBanner, { borderColor: tokens.borderColor }]}>
+          <View style={[styles.statusBanner, { backgroundColor: tokens.cardBg, borderColor: tokens.borderColor }]}>
             <View style={styles.statusHeader}>
               <View style={styles.liveIndicator}>
                 <Animated.View style={[styles.pulseDot, { opacity: pulseAnim }]} />
@@ -288,7 +288,7 @@ const confirmLogout = () => {
                 <Text style={[styles.deviceStatus, { color: tokens.subTextColor }]}>Calibrating</Text>
               </View>
             </View>
-          </BlurView>
+          </View>
 
           {/* Quick Stats */}
           <View style={styles.statsGrid}>
@@ -319,7 +319,7 @@ const confirmLogout = () => {
                 <TrendingUp size={20} color={tokens.textColor} />
                 <Text style={[styles.sectionTitle, { color: tokens.textColor, marginHorizontal: 10, marginBottom: 0 }]}>Attendance Trend</Text>
               </View>
-              <BlurView intensity={20} tint={isLightTheme ? 'light' : 'dark'} style={[styles.chartContainer, { borderColor: tokens.borderColor }]}>
+              <View style={[styles.chartContainer, { backgroundColor: tokens.cardBg, borderColor: tokens.borderColor }]}>
                 <LineChart
                   data={{
                     labels: analyticsData.trend.labels,
@@ -340,7 +340,7 @@ const confirmLogout = () => {
                   bezier
                   style={{ marginVertical: 8, borderRadius: 16 }}
                 />
-              </BlurView>
+              </View>
 
             </View>
           )}
@@ -386,13 +386,13 @@ const confirmLogout = () => {
                 <View style={{ marginTop: 16 }}>
                   <Text style={[styles.sectionTitle, { color: tokens.textColor, fontSize: 14, marginBottom: 8 }]}>Suspicious Activity Logs</Text>
                   {suspiciousLogs.slice(0, 3).map((log, idx) => (
-                    <BlurView key={idx} intensity={20} tint={isLightTheme ? 'light' : 'dark'} style={[styles.logCard, { borderColor: tokens.borderColor }]}>
+                    <View key={idx} style={[styles.logCard, { backgroundColor: tokens.cardBg, borderColor: tokens.borderColor }]}>
                       <AlertTriangle size={18} color="#EF4444" />
                       <View style={{ flex: 1 }}>
                         <Text style={[styles.logTitle, { color: tokens.textColor }]}>{log.event_type.replace('_', ' ')}</Text>
                         <Text style={[styles.logSub, { color: tokens.subTextColor }]}>{log.notes || `Confidence: ${!isNaN(parseFloat(log.confidence)) ? (parseFloat(log.confidence) * 100).toFixed(0) : 0}%`}</Text>
                       </View>
-                    </BlurView>
+                    </View>
                   ))}
                 </View>
               )}
@@ -432,13 +432,6 @@ const confirmLogout = () => {
               icon={AlertTriangle} 
               color="#F59E0B"
               onPress={() => navigation.navigate('AdminReports')}
-            />
-            <AdminCard 
-              title="Audit Log" 
-              subtitle="System activity & audit trails"
-              icon={Database} 
-              color="#F472B6"
-              onPress={() => navigation.navigate('DatabaseLogs')}
             />
           </View>
 

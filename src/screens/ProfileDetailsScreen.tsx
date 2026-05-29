@@ -12,7 +12,7 @@ import {
   Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
+// import { BlurView } from 'expo-blur';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import AnimatedBackground from '../components/ui/AnimatedBackground';
 import { ArrowLeft, User, Mail, Briefcase, Camera, IdCard, Phone, BookOpen, GraduationCap, Save, ChevronLeft } from 'lucide-react-native';
@@ -30,7 +30,8 @@ import * as FileSystem from 'expo-file-system';
 export default function ProfileDetailsScreen() {
   const navigation = useNavigation<any>();
   const { user, login, role } = useAuth();
-  const { tokens, isLightTheme } = useTheme();
+  const { tokens, isLightTheme, themeColors } = useTheme();
+  const themePrimary = themeColors && themeColors.length > 0 ? themeColors[Math.min(1, themeColors.length - 1)] : Colors.ai.primary;
 
   const [name, setName] = useState(user?.fullName || '');
   const [email, setEmail] = useState(user?.email || '');
@@ -167,10 +168,10 @@ export default function ProfileDetailsScreen() {
             style={styles.header}
           >
             <TouchableOpacity
-              style={[styles.backButton, { backgroundColor: tokens.iconButtonBg, borderColor: tokens.borderColor }]}
+              style={styles.backButton}
               onPress={() => navigation.goBack()}
             >
-              <ChevronLeft color={tokens.textColor} size={28} />
+              <ChevronLeft color={tokens.textColor} size={32} />
             </TouchableOpacity>
             <Text style={[styles.headerTitle, { color: tokens.textColor }]}>Ubah Profil</Text>
             <View style={{ width: 44 }} />
@@ -184,7 +185,7 @@ export default function ProfileDetailsScreen() {
                   <Image source={{ uri: avatar }} style={{ width: 120, height: 120, borderRadius: 60, borderWidth: 4, borderColor: tokens.borderColor }} />
                 ) : (
                   <LinearGradient
-                    colors={isLightTheme ? ['#1E4FA8', '#2D6CDF'] : ['#3B82F6', '#8B5CF6']}
+                    colors={isLightTheme ? [themePrimary, themePrimary] : [themePrimary, themePrimary]}
                     style={styles.avatarGradient}
                   >
                     <User size={80} color="#fff" />
@@ -195,7 +196,7 @@ export default function ProfileDetailsScreen() {
               {/* Kamera icon - klik untuk ganti foto */}
               <TouchableOpacity
                 onPress={pickImage}
-                style={{ position: 'absolute', bottom: 0, right: 0, backgroundColor: isLightTheme ? '#1E4FA8' : '#3B82F6', padding: 8, borderRadius: 20 }}
+                style={{ position: 'absolute', bottom: 0, right: 0, backgroundColor: themePrimary, padding: 8, borderRadius: 20 }}
               >
                 <Camera size={16} color="#fff" />
               </TouchableOpacity>
@@ -212,18 +213,18 @@ export default function ProfileDetailsScreen() {
             </View>
           </View>
 
-          {/* Card */}
-          <BlurView intensity={20} tint={isLightTheme ? 'light' : 'dark'} style={[styles.card, { backgroundColor: tokens.cardBg, borderColor: tokens.borderColor }]}>
+          {/* Single Card for Edit Profile */}
+          <View style={[styles.card, { backgroundColor: tokens.cardBg, borderColor: isLightTheme ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.15)' }]}>
             <View style={styles.fieldsContainer}>
               {/* Nama */}
               <View style={styles.field}>
                 <View style={styles.fieldHeader}>
-                  <User size={18} color={isLightTheme ? '#1E4FA8' : Colors.ai.primary} />
+                  <User size={18} color={themePrimary} />
                   <Text style={[styles.fieldLabel, { color: tokens.labelColor }]}>Nama Lengkap</Text>
                 </View>
                 <View style={styles.fieldContent}>
                   <TextInput
-                    style={[styles.input, { color: tokens.textColor, borderBottomColor: tokens.borderColor }]}
+                    style={[styles.input, { color: tokens.textColor, borderColor: tokens.borderColor }]}
                     value={name}
                     onChangeText={(t) => {
                       setName(t);
@@ -239,12 +240,12 @@ export default function ProfileDetailsScreen() {
               {/* Email */}
               <View style={styles.field}>
                 <View style={styles.fieldHeader}>
-                  <Mail size={18} color={isLightTheme ? '#1E4FA8' : Colors.ai.primary} />
+                  <Mail size={18} color={themePrimary} />
                   <Text style={[styles.fieldLabel, { color: tokens.labelColor }]}>Email</Text>
                 </View>
                 <View style={styles.fieldContent}>
                   <TextInput
-                    style={[styles.input, { color: tokens.textColor, borderBottomColor: tokens.borderColor }]}
+                    style={[styles.input, { color: tokens.textColor, borderColor: tokens.borderColor }]}
                     value={email}
                     onChangeText={(t) => {
                       setEmail(t);
@@ -261,14 +262,14 @@ export default function ProfileDetailsScreen() {
               {/* NIM / NIP */}
               <View style={styles.field}>
                 <View style={styles.fieldHeader}>
-                  <IdCard size={18} color={isLightTheme ? '#1E4FA8' : Colors.ai.primary} />
+                  <IdCard size={18} color={themePrimary} />
                   <Text style={[styles.fieldLabel, { color: tokens.labelColor }]}>
                     {role === 'dosen' ? 'NIP' : role === 'admin' ? 'Admin ID' : 'NIM'}
                   </Text>
                 </View>
                 <View style={styles.fieldContent}>
                   <TextInput
-                    style={[styles.input, { color: tokens.subTextColor, borderBottomColor: tokens.borderColor }]}
+                    style={[styles.input, { color: tokens.subTextColor, borderColor: tokens.borderColor }]}
                     value={idNumber}
                     editable={false}
                   />
@@ -280,12 +281,12 @@ export default function ProfileDetailsScreen() {
                 <>
                   <View style={styles.field}>
                     <View style={styles.fieldHeader}>
-                      <BookOpen size={18} color={isLightTheme ? '#1E4FA8' : Colors.ai.primary} />
+                      <BookOpen size={18} color={themePrimary} />
                       <Text style={[styles.fieldLabel, { color: tokens.labelColor }]}>Program Studi</Text>
                     </View>
                     <View style={styles.fieldContent}>
                       <TextInput
-                        style={[styles.input, { color: tokens.textColor, borderBottomColor: tokens.borderColor }]}
+                        style={[styles.input, { color: tokens.textColor, borderColor: tokens.borderColor }]}
                         value={prodi}
                         onChangeText={(t) => {
                           setProdi(t);
@@ -300,12 +301,12 @@ export default function ProfileDetailsScreen() {
 
                   <View style={styles.field}>
                     <View style={styles.fieldHeader}>
-                      <GraduationCap size={18} color={isLightTheme ? '#1E4FA8' : Colors.ai.primary} />
+                      <GraduationCap size={18} color={themePrimary} />
                       <Text style={[styles.fieldLabel, { color: tokens.labelColor }]}>Kelas</Text>
                     </View>
                     <View style={styles.fieldContent}>
                       <TextInput
-                        style={[styles.input, { color: tokens.textColor, borderBottomColor: tokens.borderColor }]}
+                        style={[styles.input, { color: tokens.textColor, borderColor: tokens.borderColor }]}
                         value={kelas}
                         onChangeText={(t) => {
                           setKelas(t);
@@ -324,12 +325,12 @@ export default function ProfileDetailsScreen() {
               {role === 'dosen' && (
                 <View style={styles.field}>
                   <View style={styles.fieldHeader}>
-                    <Phone size={18} color={isLightTheme ? '#1E4FA8' : Colors.ai.primary} />
+                    <Phone size={18} color={themePrimary} />
                     <Text style={[styles.fieldLabel, { color: tokens.labelColor }]}>Nomor Telepon</Text>
                   </View>
                   <View style={styles.fieldContent}>
                     <TextInput
-                      style={[styles.input, { color: tokens.textColor, borderBottomColor: tokens.borderColor }]}
+                      style={[styles.input, { color: tokens.textColor, borderColor: tokens.borderColor }]}
                       value={phone}
                       onChangeText={(t) => {
                         setPhone(t);
@@ -349,7 +350,7 @@ export default function ProfileDetailsScreen() {
                 ⚠️ Perubahan data akan tersimpan di profil akun Anda.
               </Text>
             </View>
-          </BlurView>
+          </View>
 
           {/* Button */}
           <View style={styles.buttonContainer}>
@@ -363,6 +364,7 @@ export default function ProfileDetailsScreen() {
             <TouchableOpacity
               style={[
                 styles.primaryButton,
+                { backgroundColor: themePrimary, shadowColor: themePrimary }
               ]}
               onPress={handleSave}
               disabled={saving}
@@ -408,8 +410,11 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '500',
     paddingVertical: 10,
-    paddingHorizontal: 0,
-    borderBottomWidth: 1,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    backgroundColor: "rgba(128,128,128,0.1)",
+    
     borderBottomColor: 'rgba(255,255,255,0.1)',
   },
 
@@ -417,20 +422,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: Platform.OS === 'web' ? 20 : Platform.OS === 'ios' ? 60 : 50,
-    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'web' ? 20 : Platform.OS === 'ios' ? 40 : 30,
+    paddingHorizontal: 16,
     paddingBottom: 20,
   },
 
   backButton: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    width: 44,
-    height: 44,
-    borderRadius: 14,
+    width: 40,
+    height: 40,
     justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    alignItems: 'flex-start',
   },
 
   headerTitle: {

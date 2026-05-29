@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, ViewStyle } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
-import { BlurView } from 'expo-blur';
 
 interface AppCardProps {
   children: React.ReactNode;
@@ -23,9 +22,9 @@ export default function AppCard({ children, style, variant = 'glass', padding = 
 
   if (variant === 'glass') {
     return (
-      <BlurView intensity={isLightTheme ? 40 : 20} tint={isLightTheme ? 'light' : 'dark'} style={[baseStyle, style]}>
+      <View style={[baseStyle, { backgroundColor: tokens.cardBg }, style]}>
         {children}
-      </BlurView>
+      </View>
     );
   }
 

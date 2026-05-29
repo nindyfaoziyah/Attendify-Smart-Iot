@@ -7,6 +7,7 @@ import { useTheme } from '../context/ThemeContext';
 import AnimatedBackground from '../components/ui/AnimatedBackground';
 import { BlurView } from 'expo-blur';
 import { Colors } from '../../constants/Colors';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function PrivacySecurityScreen() {
   const navigation = useNavigation<any>();
@@ -24,10 +25,10 @@ export default function PrivacySecurityScreen() {
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
-            style={[styles.backButton, { backgroundColor: tokens.iconButtonBg, borderColor: tokens.borderColor }]}
+            style={{ padding: 8, marginLeft: -8 }}
             onPress={() => navigation.goBack()}
           >
-            <ArrowLeft color={tokens.textColor} size={24} />
+            <Ionicons name="chevron-back" color={tokens.textColor} size={28} />
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: tokens.textColor }]}>Privasi & Keamanan</Text>
           <View style={{ width: 44 }} />

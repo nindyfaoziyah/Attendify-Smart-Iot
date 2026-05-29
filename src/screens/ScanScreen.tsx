@@ -29,7 +29,7 @@ const cameraRef = useRef<any>(null);
   const [hasManualPermission, setHasManualPermission] = useState(false);
   const [permissionLoading, setPermissionLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
-  const [result, setResult] = useState<'success' | 'failed' | null>(null);
+  const [result, setResult] = useState<'success' | 'failed' | 'duplicate' | 'no_schedule' | 'manual_denied' | null>(null);
   const [scanTime, setScanTime] = useState<string>('');
   const [lastScanTime, setLastScanTime] = useState(0);
   const scanLineAnim = useRef(new Animated.Value(0)).current;
@@ -78,21 +78,21 @@ const cameraRef = useRef<any>(null);
         Animated.sequence([
           Animated.timing(scanLineAnim, {
             toValue: 1,
-            duration: 2000,
+            duration: 1000,
             easing: Easing.inOut(Easing.quad),
             useNativeDriver: true,
           }),
           Animated.timing(scanLineAnim, {
             toValue: 0,
-            duration: 2000,
+            duration: 1000,
             easing: Easing.inOut(Easing.quad),
             useNativeDriver: true,
           }),
         ])
       ).start();
 
-      const timer = setTimeout(performScan, 3000);
-      return () => clearTimeout(timer);
+      // Langsung eksekusi tanpa menunggu 3 detik
+      performScan();
     }
   }, [scanning]);
 
@@ -102,8 +102,8 @@ const cameraRef = useRef<any>(null);
       
       let imageBase64 = '';
       if (cameraRef.current) {
-        // Ambil foto betulan dari kamera HP dengan resolusi rendah agar ringan
-        const photo = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.5 });
+        // Ambil foto betulan dari kamera HP dengan resolusi rendah dan tanpa post-processing agar 10x lebih cepat
+        const photo = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.3, skipProcessing: true });
         imageBase64 = photo.base64;
       }
 
@@ -135,6 +135,12 @@ const cameraRef = useRef<any>(null);
         setLastScanTime(Date.now());
         const now = new Date();
         setScanTime(`${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`);
+      } else if (data.status === 'duplicate') {
+        setResult('duplicate');
+      } else if (data.status === 'no_schedule') {
+        setResult('no_schedule');
+      } else if (data.status === 'manual_denied') {
+        setResult('manual_denied');
       } else {
         console.log('API Failed:', data.message);
         setResult('failed');
@@ -192,7 +198,7 @@ const cameraRef = useRef<any>(null);
       <CameraView style={styles.camera} facing="front" ref={cameraRef} />
       
       <View style={styles.overlay}>
-        <View style={[styles.overlayTop, { paddingTop: Math.max(insets.top, 20) }]}>
+        <View style={[styles.overlayTop, { paddingTop: Math.max(insets.top, 10) }]}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.closeBtn}>
             <X color="#fff" size={24} />
           </TouchableOpacity>
@@ -289,46 +295,65 @@ alert('Izin Diperlukan: Hubungi dosen untuk scan manual');
         <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill}>
           <View style={styles.portal}>
             <LinearGradient
-              colors={result === 'success' 
-                ? ['rgba(16, 185, 129, 0.1)', 'rgba(6, 78, 59, 0.4)'] 
-                : ['rgba(239, 68, 68, 0.1)', 'rgba(127, 29, 29, 0.4)']}
+              colors={
+                result === 'success' ? ['rgba(16, 185, 129, 0.1)', 'rgba(6, 78, 59, 0.4)'] :
+                result === 'duplicate' ? ['rgba(59, 130, 246, 0.1)', 'rgba(30, 58, 138, 0.4)'] :
+                result === 'no_schedule' ? ['rgba(245, 158, 11, 0.1)', 'rgba(120, 53, 15, 0.4)'] :
+                ['rgba(239, 68, 68, 0.1)', 'rgba(127, 29, 29, 0.4)']
+              }
               style={styles.portalCard}
             >
               <View style={[
                 styles.iconPortal, 
-                { backgroundColor: result === 'success' 
-                  ? 'rgba(16,185,129,0.2)' 
-                  : 'rgba(239,68,68,0.2)' }
+                { backgroundColor: 
+                  result === 'success' ? 'rgba(16,185,129,0.2)' : 
+                  result === 'duplicate' ? 'rgba(59, 130, 246, 0.2)' : 
+                  result === 'no_schedule' ? 'rgba(245, 158, 11, 0.2)' : 
+                  'rgba(239,68,68,0.2)' 
+                }
               ]}>
                 {result === 'success' ? (
                   <CheckCircle color="#10B981" size={48} />
+                ) : result === 'duplicate' ? (
+                  <CheckCircle color="#3B82F6" size={48} />
+                ) : result === 'no_schedule' ? (
+                  <AlertCircle color="#F59E0B" size={48} />
                 ) : (
                   <AlertCircle color="#EF4444" size={48} />
                 )}
               </View>
 
               <Text style={styles.portalTitle}>
-                {result === 'success' ? 'ABSENSI BERHASIL' : 'SCAN GAGAL'}
+                {result === 'success' ? 'ABSENSI BERHASIL' : 
+                 result === 'duplicate' ? 'SUDAH ABSEN' : 
+                 result === 'no_schedule' ? 'TIDAK ADA JADWAL' : 
+                 result === 'manual_denied' ? 'IZIN DITOLAK' : 
+                 'SCAN GAGAL'}
               </Text>
               
               <Text style={styles.portalSub}>
-                {result === 'success' 
-                  ? `Wajah terdeteksi! Absensi tercatat pukul ${scanTime}` 
-                  : 'Wajah tidak dikenali atau belum terdaftar. Pastikan wajah sudah didaftarkan dan pencahayaan cukup.'}
+                {result === 'success' ? `Wajah terdeteksi! Absensi tercatat pukul ${scanTime}` : 
+                 result === 'duplicate' ? 'Anda sudah melakukan presensi untuk jadwal ini hari ini.' : 
+                 result === 'no_schedule' ? 'Tidak ada jadwal kelas yang aktif saat ini.' : 
+                 result === 'manual_denied' ? 'Izin scan manual Anda telah dicabut oleh dosen.' : 
+                 'Wajah tidak dikenali atau belum terdaftar. Pastikan wajah sudah didaftarkan dan pencahayaan cukup.'}
               </Text>
 
               <TouchableOpacity 
                 style={[
                   styles.portalAction, 
-                  { backgroundColor: result === 'success' ? '#10B981' : '#EF4444' }
+                  { backgroundColor: result === 'success' ? '#10B981' : 
+                                     result === 'duplicate' ? '#3B82F6' : 
+                                     result === 'no_schedule' ? '#F59E0B' : 
+                                     '#EF4444' }
                 ]}
                 onPress={() => {
                   setResult(null);
-                  if (result === 'success') navigation.goBack();
+                  if (result === 'success' || result === 'duplicate') navigation.goBack();
                 }}
               >
                 <Text style={styles.actionText}>
-                  {result === 'success' ? 'KE DASHBOARD' : 'COBA LAGI'}
+                  {result === 'success' || result === 'duplicate' ? 'KE DASHBOARD' : 'COBA LAGI'}
                 </Text>
               </TouchableOpacity>
             </LinearGradient>
@@ -398,7 +423,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 24,
+    paddingHorizontal: 16,
   },
   closeBtn: {
     width: 44,

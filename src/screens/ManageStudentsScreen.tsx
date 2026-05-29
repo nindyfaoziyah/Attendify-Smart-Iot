@@ -13,20 +13,16 @@ import {
   Platform,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage'; 
-import { Camera, CameraView } from 'expo-camera';
+import { Camera, CameraView, useCameraPermissions } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons'; 
 import { LinearGradient } from 'expo-linear-gradient';
 import io from 'socket.io-client';
-
-// ==================== CONFIG LOGIK AUTO IP ====================
-const IP_LAPTOP = '192.168.1.15'; // Sesuaikan dengan IP Laptopmu saat tes di HP
-
-const API_URL = Platform.OS === 'web' 
-  ? 'http://localhost:5000' 
-  : `http://${IP_LAPTOP}:5000`;
-// ==============================================================
+import { useTheme } from '../context/ThemeContext';
+import { Colors } from '@/constants/Colors';
+import { API_URL } from '@/constants/Config';
 
 interface Student {
+  id?: number;
   nim: string;
   name: string;
   email: string;
@@ -38,6 +34,8 @@ interface Student {
 }
 
 export default function ManageStudentsScreen({ navigation }: any) {
+  const { isLightTheme, tokens } = useTheme();
+  const [alertConfig, setAlertConfig] = useState<{ visible: boolean; title: string; message: string; type: 'success' | 'error' | 'confirm'; onConfirm?: () => void; }>({ visible: false, title: '', message: '', type: 'success' });
   const [activeTab, setActiveTab] = useState<'siswa' | 'jadwal'>('siswa');
   const [students, setStudents] = useState<Student[]>([]);
   const [jadwals, setJadwals] = useState<any[]>([]);
@@ -76,12 +74,17 @@ export default function ManageStudentsScreen({ navigation }: any) {
   const [editKelas, setEditKelas] = useState('');
   const [editPassword, setEditPassword] = useState('');
 
+  const [reportModalVisible, setReportModalVisible] = useState(false);
+  const [reportData, setReportData] = useState<any>(null);
+  const [selectedJadwalInfo, setSelectedJadwalInfo] = useState<any>(null);
+  const [reportLoading, setReportLoading] = useState(false);
+
   // Setup Izin Kamera menggunakan Hook bawaan Expo terbaru
   let permission: any = null;
   let requestPermission: any = () => {};
   
   try {
-    const [camPermission, askCamPermission] = Camera.useCameraPermissions();
+    const [camPermission, askCamPermission] = useCameraPermissions();
     permission = camPermission;
     requestPermission = askCamPermission;
   } catch (e) {
@@ -107,19 +110,15 @@ export default function ManageStudentsScreen({ navigation }: any) {
     }
   };
 
-  const showNotification = (title: string, message: string) => {
-    if (Platform.OS === 'web') {
-      alert(`${title}: ${message}`);
-    } else {
-      Alert.alert(title, message);
-    }
+  const showNotification = (title: string, message: string, type: 'success' | 'error' = 'success') => {
+    setAlertConfig({ visible: true, title, message, type });
   };
 
   useEffect(() => {
     fetchStudents();
     fetchJadwals();
 
-    socketRef.current = io(API_URL);
+    socketRef.current = io(API_URL.replace('/api', ''));
     socketRef.current.on('ai_status_update', (data: any) => {
       if (data.nim === nim) {
         setAiResponseStatus(data);
@@ -135,7 +134,7 @@ export default function ManageStudentsScreen({ navigation }: any) {
     setLoading(true);
     try {
       const token = await getAuthToken(); 
-      const response = await fetch(`${API_URL}/api/admin/students`, {
+      const response = await fetch(`${API_URL}/admin/students`, {
         method: 'GET',
         headers: {
           'Authorization': token ? `Bearer ${token}` : '', 
@@ -153,48 +152,39 @@ export default function ManageStudentsScreen({ navigation }: any) {
     }
   };
 
-  const handleDeleteStudent = async (id: number, name: string) => {
-    if (Platform.OS === 'web') {
-      if (!window.confirm(`Yakin ingin menghapus data mahasiswa ${name}?`)) return;
-    } else {
-      Alert.alert(
-        "Hapus Mahasiswa",
-        `Yakin ingin menghapus data mahasiswa ${name}?`,
-        [
-          { text: "Batal", style: "cancel" },
-          { text: "Hapus", style: "destructive", onPress: () => performDelete(id) }
-        ]
-      );
-      return;
-    }
-    await performDelete(id);
-  };
-
-  const performDelete = async (id: number) => {
-    try {
-      const token = await getAuthToken();
-      const res = await fetch(`${API_URL}/api/admin/students/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': token ? `Bearer ${token}` : '',
+  const handleDeleteStudent = (id: number, name: string) => {
+    setAlertConfig({
+      visible: true,
+      title: 'Hapus Mahasiswa',
+      message: `Yakin ingin menghapus data mahasiswa ${name}?`,
+      type: 'confirm',
+      onConfirm: async () => {
+        setAlertConfig(prev => ({ ...prev, visible: false }));
+        try {
+          const token = await getAuthToken();
+          const res = await fetch(`${API_URL}/admin/students/${id}`, { 
+            method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          if (res.ok) {
+            showNotification('Berhasil', 'Mahasiswa berhasil dihapus', 'success');
+            fetchStudents();
+          } else {
+            showNotification('Gagal', 'Gagal menghapus mahasiswa', 'error');
+          }
+        } catch (error) {
+          showNotification('Error', 'Kesalahan jaringan', 'error');
         }
-      });
-      if (res.ok) {
-        showNotification('Berhasil', 'Mahasiswa berhasil dihapus');
-        fetchStudents();
-      } else {
-        showNotification('Gagal', 'Gagal menghapus mahasiswa');
       }
-    } catch (e) {
-      console.log('Delete error', e);
-      showNotification('Error', 'Kesalahan jaringan');
-    }
+    });
   };
 
   const fetchJadwals = async () => {
     try {
       const token = await getAuthToken(); 
-      const response = await fetch(`${API_URL}/api/jadwal`, {
+      const response = await fetch(`${API_URL}/jadwal`, {
         method: 'GET',
         headers: {
           'Authorization': token ? `Bearer ${token}` : '', 
@@ -218,7 +208,7 @@ export default function ManageStudentsScreen({ navigation }: any) {
     setLoading(true);
     try {
       const token = await getAuthToken();
-      const res = await fetch(`${API_URL}/api/jadwal`, {
+      const res = await fetch(`${API_URL}/jadwal`, {
         method: 'POST',
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
@@ -252,7 +242,7 @@ export default function ManageStudentsScreen({ navigation }: any) {
     setLoading(true);
     try {
       const token = await getAuthToken();
-      const response = await fetch(`${API_URL}/api/admin/students/${editId}`, {
+      const response = await fetch(`${API_URL}/admin/students/${editId}`, {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
@@ -283,6 +273,69 @@ export default function ManageStudentsScreen({ navigation }: any) {
     }
   };
 
+  const fetchScheduleReport = async (jadwal: any) => {
+    setSelectedJadwalInfo(jadwal);
+    setReportModalVisible(true);
+    setReportLoading(true);
+    try {
+      const token = await getAuthToken();
+      const res = await fetch(`${API_URL}/reports/schedule-stats?jadwal_id=${jadwal.id}&class_id=${jadwal.kelas_id}`, {
+        headers: { 'Authorization': token ? `Bearer ${token}` : '' }
+      });
+      const result = await res.json();
+      if (res.ok && result.status === 'success') {
+        setReportData(result.data);
+      } else {
+        showNotification('Error', result.message || 'Gagal mengambil data laporan');
+      }
+    } catch (error) {
+      showNotification('Error', 'Kesalahan jaringan');
+    } finally {
+      setReportLoading(false);
+    }
+  };
+
+  const handleDownload = async (type: 'excel' | 'pdf') => {
+    if (!selectedJadwalInfo) return;
+    const url = `${API_URL}/reports/${type}?jadwal_id=${selectedJadwalInfo.id}&class_id=${selectedJadwalInfo.kelas_id}`;
+    if (Platform.OS === 'web') {
+      window.open(url, '_blank');
+    } else {
+      import('react-native').then(({ Linking }) => {
+        Linking.openURL(url);
+      });
+    }
+  };
+
+  const handleSendWA = (target: 'dekan' | 'kaprodi') => {
+    if (!selectedJadwalInfo || !reportData || !reportData.students) return;
+    const phone = '6285775607738';
+    
+    // Ambil data prodi dan kelas dari data mahasiswa pertama, jika kosong ambil fallback dari jadwal
+    const firstStudent = reportData.students.length > 0 ? reportData.students[0] : null;
+    let prodiName = firstStudent?.prodi ? firstStudent.prodi : '-';
+    // Format huruf awal kapital (Title Case) untuk prodi
+    prodiName = prodiName.split(' ').map((word: string) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+    
+    const kelasName = firstStudent?.class_name || selectedJadwalInfo.class_name || '-';
+    // Ekstrak angka tingkat (misal IF-4A -> 4)
+    const tingkatMatch = kelasName.match(/\d+/);
+    const tingkatDesc = tingkatMatch ? ` (Tingkat ${tingkatMatch[0]})` : '';
+
+    const text = `Yth. Bapak/Ibu ${target === 'dekan' ? 'Dekan' : 'Kaprodi'},\n\nBerikut ringkasan absensi perkuliahan hari ini:\n\n*Mata Kuliah*: ${selectedJadwalInfo.subject}\n*Program Studi*: ${prodiName}\n*Kelas*: ${kelasName}${tingkatDesc}\n\n*Statistik Kehadiran:*\n✅ Hadir: ${reportData.stats.hadir}\n⚠️ Telat: ${reportData.stats.terlambat}\nℹ️ Izin: ${reportData.stats.izin}\n❌ Alfa / Belum Hadir: ${reportData.stats.alfa + reportData.stats.belum_hadir}\n\nUnduh Laporan Lengkap:\n📄 PDF: /reports/pdf?jadwal_id=${selectedJadwalInfo.id}\n📊 Excel: /reports/excel?jadwal_id=${selectedJadwalInfo.id}`;
+    const url = `whatsapp://send?phone=${phone}&text=${encodeURIComponent(text)}`;
+    
+    if (Platform.OS === 'web') {
+      window.open(`https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(text)}`, '_blank');
+    } else {
+      import('react-native').then(({ Linking }) => {
+        Linking.openURL(url).catch(() => {
+          showNotification('Gagal', 'WhatsApp tidak terpasang di perangkat ini');
+        });
+      });
+    }
+  };
+
   const handleNextToStep2 = async () => {
     if (!nim || !name || !email || !password || !prodi || !kelas) {
       showNotification('Peringatan', 'Mohon lengkapi semua data mahasiswa!');
@@ -298,7 +351,7 @@ export default function ManageStudentsScreen({ navigation }: any) {
         return;
       }
 
-      const response = await fetch(`${API_URL}/api/admin/students`, {
+      const response = await fetch(`${API_URL}/admin/students`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -360,7 +413,7 @@ export default function ManageStudentsScreen({ navigation }: any) {
 
     try {
       const token = await getAuthToken();
-      const response = await fetch(`${API_URL}/api/admin/face/register`, {
+      const response = await fetch(`${API_URL}/admin/face/register`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -383,7 +436,7 @@ export default function ManageStudentsScreen({ navigation }: any) {
     setSubmittingFinal(true);
     try {
       const token = await getAuthToken();
-      const response = await fetch(`${API_URL}/api/admin/students/activate`, {
+      const response = await fetch(`${API_URL}/admin/students/activate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -443,9 +496,9 @@ export default function ManageStudentsScreen({ navigation }: any) {
     <LinearGradient colors={['#4942E4', '#2155CD', '#112D82']} style={styles.container}>
       
       {/* SCREEN UTAMA DAFTAR MAHASISWA */}
-      <View style={styles.header}>
+      <View style={[styles.header, { marginBottom: 32 }]}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={20} color="#FFF" />
+          <Ionicons name="chevron-back" size={28} color="#FFF" />
         </TouchableOpacity>
         <Text style={styles.title}>Data Mahasiswa & Biometrik</Text>
         <View style={{ width: 40 }} />
@@ -453,21 +506,21 @@ export default function ManageStudentsScreen({ navigation }: any) {
 
       <View style={styles.tabContainer}>
         <TouchableOpacity style={[styles.tabBtn, activeTab === 'siswa' && styles.activeTabBtn]} onPress={() => setActiveTab('siswa')}>
-          <Ionicons name="people-outline" size={18} color={activeTab === 'siswa' ? '#FFF' : 'rgba(255,255,255,0.4)'} style={{ marginRight: 8 }} />
+          <Ionicons name="people-outline" size={18} color={activeTab === 'siswa' ? '#FFF' : 'rgba(255,255,255,0.7)'} style={{ marginRight: 8 }} />
           <Text style={[styles.tabText, activeTab === 'siswa' && styles.activeTabText]}>Data Siswa</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.tabBtn, activeTab === 'jadwal' && styles.activeTabBtn]} onPress={() => setActiveTab('jadwal')}>
-          <Ionicons name="calendar-outline" size={18} color={activeTab === 'jadwal' ? '#FFF' : 'rgba(255,255,255,0.4)'} style={{ marginRight: 8 }} />
+          <Ionicons name="calendar-outline" size={18} color={activeTab === 'jadwal' ? '#FFF' : 'rgba(255,255,255,0.7)'} style={{ marginRight: 8 }} />
           <Text style={[styles.tabText, activeTab === 'jadwal' && styles.activeTabText]}>Jadwal</Text>
         </TouchableOpacity>
       </View>
 
       <View style={styles.searchContainer}>
-        <Ionicons name="search-outline" size={18} color="rgba(255,255,255,0.4)" style={{ marginRight: 10 }} />
+        <Ionicons name="search-outline" size={18} color="rgba(255,255,255,0.7)" style={{ marginRight: 10 }} />
         <TextInput
           style={[styles.searchInput, Platform.OS === 'web' && ({ outlineWidth: 0 } as any)]}
           placeholder={activeTab === 'siswa' ? "Cari mahasiswa..." : "Cari jadwal..."}
-          placeholderTextColor="rgba(255,255,255,0.35)"
+          placeholderTextColor="rgba(255,255,255,0.6)"
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
@@ -479,7 +532,7 @@ export default function ManageStudentsScreen({ navigation }: any) {
             <ActivityIndicator size="large" color="#FFF" style={{ marginTop: 40 }} />
           ) : filteredStudents.length === 0 ? (
             <View style={styles.emptyContainer}>
-              <Ionicons name="people-outline" size={56} color="rgba(255,255,255,0.25)" />
+              <Ionicons name="people-outline" size={56} color="rgba(255,255,255,0.5)" />
               <Text style={styles.emptyText}>Belum ada mahasiswa</Text>
             </View>
           ) : (
@@ -524,7 +577,7 @@ export default function ManageStudentsScreen({ navigation }: any) {
         <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
           <View style={styles.gridContainer}>
             {jadwals.map((jadwal: any) => (
-              <View key={jadwal.id} style={styles.studentCard}>
+              <TouchableOpacity key={jadwal.id} style={styles.studentCard} onPress={() => fetchScheduleReport(jadwal)}>
                 <View style={[styles.studentAvatarFallback, { backgroundColor: '#3B82F6' }]}>
                   <Ionicons name="book-outline" size={24} color="#FFF" />
                 </View>
@@ -535,7 +588,7 @@ export default function ManageStudentsScreen({ navigation }: any) {
                   </Text>
                   <Text style={styles.studentDetails}>Dosen: {jadwal.dosen_name} • Kelas: {jadwal.class_name}</Text>
                 </View>
-              </View>
+              </TouchableOpacity>
             ))}
           </View>
         </ScrollView>
@@ -587,8 +640,8 @@ export default function ManageStudentsScreen({ navigation }: any) {
             <Text style={styles.inputLabel}>Jam Selesai</Text>
             <TextInput style={styles.inputBox} placeholder="Contoh: 10:30:00" placeholderTextColor="#56637A" value={jadwalFormData.jam_selesai} onChangeText={t => setJadwalFormData({...jadwalFormData, jam_selesai: t})} autoComplete="off" />
             
-            <TouchableOpacity style={[styles.primaryBtn, { marginTop: 20 }]} onPress={handleSaveJadwal} disabled={loading}>
-              <Text style={styles.btnText}>{loading ? 'Menyimpan...' : 'Simpan Jadwal'}</Text>
+            <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: Colors.ai.primary, marginTop: 20 }]} onPress={handleSaveJadwal} disabled={loading}>
+              <Text style={[styles.btnText, { color: '#FFF' }]}>{loading ? 'Menyimpan...' : 'Simpan Jadwal'}</Text>
             </TouchableOpacity>
           </ScrollView>
         </View>
@@ -596,7 +649,7 @@ export default function ManageStudentsScreen({ navigation }: any) {
 
       {/* MODAL WORKFLOW MAHASISWA */}
       <Modal visible={modalVisible} animationType="slide" transparent={false}>
-        <View style={[styles.fullScreenModalContent, step === 2 && { padding: 0, paddingTop: 0 }]}>
+        <View style={[styles.fullScreenModalContent, {}, step === 2 && { padding: 0, paddingTop: 0 }]}>
           
           {step !== 2 && (
             <>
@@ -636,7 +689,7 @@ export default function ManageStudentsScreen({ navigation }: any) {
               <View style={styles.passwordContainer}>
                 <TextInput style={styles.passwordInput} placeholder="••••••••" placeholderTextColor="#56637A" value={password} onChangeText={setPassword} secureTextEntry={!showPassword} autoComplete="off" />
                 <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-                  <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={20} color="rgba(255,255,255,0.5)" />
+                  <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={20} color="#56637A" />
                 </TouchableOpacity>
               </View>
 
@@ -766,7 +819,7 @@ export default function ManageStudentsScreen({ navigation }: any) {
             <View style={styles.passwordContainer}>
               <TextInput style={styles.passwordInput} placeholder="••••••••" placeholderTextColor="#56637A" value={editPassword} onChangeText={setEditPassword} secureTextEntry={!showPassword} autoComplete="off" />
               <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-                <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={20} color="rgba(255,255,255,0.5)" />
+                <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={20} color="#56637A" />
               </TouchableOpacity>
             </View>
 
@@ -776,10 +829,136 @@ export default function ManageStudentsScreen({ navigation }: any) {
             <Text style={styles.inputLabel}>Kelas</Text>
             <TextInput style={styles.inputBox} placeholder="Contoh: IF-4A" placeholderTextColor="#56637A" value={editKelas} onChangeText={setEditKelas} autoComplete="off" />
 
-            <TouchableOpacity style={styles.primaryBtn} onPress={handleUpdateStudent} disabled={loading}>
-              {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.btnText}>Simpan Perubahan</Text>}
+            <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: Colors.ai.primary }]} onPress={handleUpdateStudent} disabled={loading}>
+              {loading ? <ActivityIndicator color="#FFF" /> : <Text style={[styles.btnText, { color: '#FFF' }]}>Simpan Perubahan</Text>}
             </TouchableOpacity>
           </ScrollView>
+        </View>
+      </Modal>
+
+      {/* MODAL LAPORAN JADWAL */}
+      <Modal visible={reportModalVisible} animationType="slide" transparent={false}>
+        <View style={styles.fullScreenModalContent}>
+          <View style={styles.modalHeader}>
+            <View>
+              <Text style={styles.modalTitle}>Laporan Kehadiran</Text>
+              <Text style={styles.modalSubtitle}>{selectedJadwalInfo?.subject || 'Memuat...'}</Text>
+            </View>
+            <TouchableOpacity onPress={() => setReportModalVisible(false)} style={styles.closeBtn}>
+              <Ionicons name="close" size={22} color="#FFF" />
+            </TouchableOpacity>
+          </View>
+          
+          <ScrollView style={styles.modalFormScroll} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 60 }}>
+            {reportLoading ? (
+              <ActivityIndicator size="large" color="#FFF" style={{ marginTop: 40 }} />
+            ) : reportData ? (
+              <>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 24, paddingHorizontal: 4, gap: 10 }}>
+                  <TouchableOpacity style={styles.modernActionBtn} onPress={() => handleDownload('excel')}>
+                    <View style={[styles.iconCircle, { backgroundColor: 'rgba(16, 185, 129, 0.15)' }]}>
+                      <Ionicons name="document-text" size={24} color="#10B981" />
+                    </View>
+                    <Text style={styles.modernActionText}>Excel</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity style={styles.modernActionBtn} onPress={() => handleDownload('pdf')}>
+                    <View style={[styles.iconCircle, { backgroundColor: 'rgba(239, 68, 68, 0.15)' }]}>
+                      <Ionicons name="document" size={24} color="#EF4444" />
+                    </View>
+                    <Text style={styles.modernActionText}>PDF</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity style={styles.modernActionBtn} onPress={() => handleSendWA('dekan')}>
+                    <View style={[styles.iconCircle, { backgroundColor: 'rgba(37, 211, 102, 0.15)' }]}>
+                      <Ionicons name="logo-whatsapp" size={24} color="#25D366" />
+                    </View>
+                    <Text style={styles.modernActionText}>WA Dekan</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity style={styles.modernActionBtn} onPress={() => handleSendWA('kaprodi')}>
+                    <View style={[styles.iconCircle, { backgroundColor: 'rgba(37, 211, 102, 0.15)' }]}>
+                      <Ionicons name="logo-whatsapp" size={24} color="#25D366" />
+                    </View>
+                    <Text style={styles.modernActionText}>WA Kaprodi</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 24, paddingHorizontal: 4 }}>
+                  <View style={[styles.metricBox, { width: '48%', marginBottom: 12, flex: undefined, backgroundColor: 'rgba(0, 224, 150, 0.05)', borderColor: 'rgba(0, 224, 150, 0.2)' }]}>
+                    <Text style={styles.metricLabel}>Masuk</Text>
+                    <Text style={[styles.metricValue, { color: '#00E096' }]}>{reportData.stats.hadir}</Text>
+                  </View>
+                  <View style={[styles.metricBox, { width: '48%', marginBottom: 12, flex: undefined, backgroundColor: 'rgba(245, 158, 11, 0.05)', borderColor: 'rgba(245, 158, 11, 0.2)' }]}>
+                    <Text style={styles.metricLabel}>Telat</Text>
+                    <Text style={[styles.metricValue, { color: '#F59E0B' }]}>{reportData.stats.terlambat}</Text>
+                  </View>
+                  <View style={[styles.metricBox, { width: '48%', flex: undefined, backgroundColor: 'rgba(59, 130, 246, 0.05)', borderColor: 'rgba(59, 130, 246, 0.2)' }]}>
+                    <Text style={styles.metricLabel}>Izin</Text>
+                    <Text style={[styles.metricValue, { color: '#3B82F6' }]}>{reportData.stats.izin}</Text>
+                  </View>
+                  <View style={[styles.metricBox, { width: '48%', flex: undefined, backgroundColor: 'rgba(239, 68, 68, 0.05)', borderColor: 'rgba(239, 68, 68, 0.2)' }]}>
+                    <Text style={styles.metricLabel}>Alfa / Belum</Text>
+                    <Text style={[styles.metricValue, { color: '#EF4444' }]}>{reportData.stats.alfa + reportData.stats.belum_hadir}</Text>
+                  </View>
+                </View>
+
+                <Text style={[styles.inputLabel, { marginBottom: 12 }]}>Daftar Mahasiswa</Text>
+                {reportData.students.length === 0 ? (
+                  <Text style={styles.emptyText}>Tidak ada data mahasiswa</Text>
+                ) : (
+                  reportData.students.map((student: any, idx: number) => (
+                    <View key={idx} style={[styles.studentCard, { padding: 12, marginBottom: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
+                      <View style={{ flex: 1, paddingRight: 10 }}>
+                        <Text style={styles.studentName} numberOfLines={1}>{student.name}</Text>
+                        <Text style={styles.studentDetails}>{student.nim} • {student.time || '--:--'}</Text>
+                      </View>
+                      <View>
+                        <Text style={[
+                          styles.validationTag, 
+                          student.status === 'HADIR' ? { color: '#00E096' } : 
+                          student.status === 'TERLAMBAT' ? { color: '#F59E0B' } : 
+                          student.status === 'IZIN' ? { color: '#3B82F6' } : 
+                          { color: '#EF4444' }
+                        ]}>
+                          {student.status}
+                        </Text>
+                      </View>
+                    </View>
+                  ))
+                )}
+              </>
+            ) : (
+              <Text style={styles.emptyText}>Data tidak tersedia</Text>
+            )}
+          </ScrollView>
+        </View>
+      </Modal>
+
+    
+      {/* CUSTOM ALERT MODAL */}
+      <Modal visible={alertConfig.visible} transparent={true} animationType="fade">
+        <View style={styles.alertOverlay}>
+          <View style={styles.alertBox}>
+            <Text style={styles.alertTitle}>{alertConfig.title}</Text>
+            <Text style={styles.alertMessage}>{alertConfig.message}</Text>
+            <View style={styles.alertActionRow}>
+              {alertConfig.type === 'confirm' ? (
+                <>
+                  <TouchableOpacity style={[styles.alertBtn, { backgroundColor: 'rgba(255,255,255,0.1)' }]} onPress={() => setAlertConfig(prev => ({ ...prev, visible: false }))}>
+                    <Text style={{ color: '#FFF' }}>Batal</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.alertBtn, { backgroundColor: '#EF4444' }]} onPress={alertConfig.onConfirm}>
+                    <Text style={{ color: '#FFF', fontWeight: 'bold' }}>Hapus</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <TouchableOpacity style={[styles.alertBtn, { backgroundColor: Colors.ai.primary, width: '100%' }]} onPress={() => setAlertConfig(prev => ({ ...prev, visible: false }))}>
+                  <Text style={{ color: '#FFF', fontWeight: 'bold' }}>OK</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
         </View>
       </Modal>
     </LinearGradient>
@@ -787,6 +966,12 @@ export default function ManageStudentsScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
+  alertOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
+  alertBox: { width: '80%', padding: 24, borderRadius: 16, backgroundColor: '#1E293B', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', alignItems: 'center' },
+  alertTitle: { fontSize: 18, fontWeight: '700', color: '#FFF', marginBottom: 8 },
+  alertMessage: { fontSize: 14, color: 'rgba(255,255,255,0.7)', textAlign: 'center', marginBottom: 20 },
+  alertActionRow: { flexDirection: 'row', justifyContent: 'center', width: '100%', gap: 12 },
+  alertBtn: { paddingVertical: 12, paddingHorizontal: 20, borderRadius: 12, alignItems: 'center', justifyContent: 'center', minWidth: 100 },
   container: { flex: 1 },
   header: {
     flexDirection: 'row',
@@ -797,14 +982,7 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === 'ios' ? 50 : 30,
     paddingBottom: 16,
   },
-  backButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  backButton: { padding: 8, borderRadius: 12, marginLeft: -8 },
   title: { fontSize: 20, fontWeight: '700', color: '#FFF', textAlign: 'center', flex: 1 },
   tabContainer: {
     flexDirection: 'row',
@@ -817,7 +995,7 @@ const styles = StyleSheet.create({
   },
   tabBtn: { flex: 1, flexDirection: 'row', paddingVertical: 10, justifyContent: 'center', alignItems: 'center', borderRadius: 8 },
   activeTabBtn: { backgroundColor: 'rgba(255, 255, 255, 0.12)' },
-  tabText: { color: 'rgba(255, 255, 255, 0.4)', fontWeight: '600', fontSize: 13 },
+  tabText: { color: 'rgba(255, 255, 255, 0.7)', fontWeight: '600', fontSize: 13 },
   activeTabText: { color: '#FFF', fontWeight: '700' },
   searchContainer: {
     flexDirection: 'row',
@@ -834,7 +1012,7 @@ const styles = StyleSheet.create({
   },
   searchInput: { flex: 1, color: '#FFF', fontSize: 13 },
   emptyContainer: { flex: 0.6, justifyContent: 'center', alignItems: 'center' },
-  emptyText: { color: 'rgba(255, 255, 255, 0.35)', fontSize: 13, marginTop: 10 },
+  emptyText: { color: 'rgba(255, 255, 255, 0.6)', fontSize: 13, marginTop: 10 },
   scrollContainer: { width: '92%', alignSelf: 'center', paddingBottom: 80 },
   gridContainer: { flexDirection: 'column' },
   studentCard: {
@@ -951,4 +1129,7 @@ const styles = StyleSheet.create({
   loadingProgressBlock: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#101626', paddingVertical: 12, borderRadius: 10, width: '100%', justifyContent: 'center' },
   errorAlertContainer: { backgroundColor: 'rgba(255, 59, 48, 0.1)', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(255, 59, 48, 0.2)', marginBottom: 12, width: '100%' },
   errorAlertText: { color: '#FF4D4D', fontSize: 13, textAlign: 'center' },
+  modernActionBtn: { flexBasis: '47%', marginBottom: 10, backgroundColor: 'rgba(255,255,255,0.04)', paddingVertical: 12, borderRadius: 16, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
+  iconCircle: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
+  modernActionText: { color: 'rgba(255,255,255,0.8)', fontSize: 11, fontWeight: '600', textAlign: 'center' },
 });

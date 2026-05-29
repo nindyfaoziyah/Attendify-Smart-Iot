@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ArrowLeft, Zap, Code2 } from 'lucide-react-native';
+import { ChevronLeft, Zap, Code2 } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
 import AnimatedBackground from '../components/ui/AnimatedBackground';
@@ -18,13 +18,13 @@ export default function AboutAttendifyScreen() {
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
-            style={[styles.backButton, { backgroundColor: tokens.iconButtonBg, borderColor: tokens.borderColor }]}
+            style={styles.backButton}
             onPress={() => navigation.goBack()}
           >
-            <ArrowLeft color={tokens.textColor} size={24} />
+            <ChevronLeft color={tokens.textColor} size={28} />
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: tokens.textColor }]}>Tentang Attendify</Text>
-          <View style={{ width: 44 }} />
+          <View style={{ width: 40 }} />
         </View>
 
         {/* Logo Section */}
@@ -143,20 +143,21 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+    width: 40,
+    height: 40,
     justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
+    alignItems: 'flex-start',
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
+    flex: 1,
+    textAlign: 'center',
   },
   logoSection: {
     alignItems: 'center',
-    marginVertical: 30,
+    marginTop: 10,
+    marginBottom: 30,
   },
   logoContainer: {
     width: 100,

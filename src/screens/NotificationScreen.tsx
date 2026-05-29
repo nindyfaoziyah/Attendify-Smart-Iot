@@ -9,7 +9,8 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
-  StatusBar
+  StatusBar,
+  Platform
 } from 'react-native';
 
 import { LinearGradient } from 'expo-linear-gradient';
@@ -20,13 +21,14 @@ import {
   AlertCircle,
   CheckCircle2,
   Clock,
-  Trash2,
   MessageSquare,
+  CheckCheck,
+  ChevronLeft
 } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { BlurView } from 'expo-blur';
+
 import Animated, { FadeInDown, SlideInUp } from 'react-native-reanimated';
 import AnimatedBackground from '../components/ui/AnimatedBackground';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -257,31 +259,40 @@ export default function NotificationScreen() {
   return (
     <AnimatedBackground style={styles.container}>
       <StatusBar barStyle={isLightTheme ? "dark-content" : "light-content"} />
-      {/* Header */}
-      <Animated.View 
-        entering={FadeInDown.duration(600).springify()}
-        style={styles.header}
-      >
-        <View style={styles.headerTop}>
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            style={[styles.backBtn, { backgroundColor: tokens.iconButtonBg, borderColor: tokens.borderColor }]}
-          >
-            <ArrowLeft color={tokens.textColor} size={24} />
-          </TouchableOpacity>
-          <View style={styles.headerInfo}>
-            <Text style={[styles.title, { color: tokens.textColor }]}>Notifikasi</Text>
-            <Text style={[styles.subtitle, { color: tokens.subTextColor }]}>
-              {unreadCount > 0 ? `${unreadCount} pesan belum dibaca` : 'Semua pesan sudah dibaca'}
-            </Text>
+      
+      <View style={[
+        styles.innerContainer, 
+        Platform.OS === 'web' && [styles.webContainer, { backgroundColor: isLightTheme ? '#FFFFFF' : '#1E293B' }]
+      ]}>
+        {/* Header */}
+        <Animated.View 
+          entering={FadeInDown.duration(600).springify()}
+          style={styles.header}
+        >
+          <View style={styles.headerTop}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+              <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+                <ChevronLeft color={tokens.textColor} size={28} />
+              </TouchableOpacity>
+              
+              <View style={{ marginLeft: 8 }}>
+                <Text style={[styles.title, { color: tokens.textColor }]}>Notifikasi</Text>
+                <Text style={[styles.subtitle, { color: tokens.subTextColor }]}>
+                   {unreadCount > 0 ? `${unreadCount} pesan baru` : `Semua telah dibaca`}
+                </Text>
+              </View>
+            </View>
+
+            {unreadCount > 0 && (
+              <TouchableOpacity 
+                onPress={handlePressNotification}
+                style={[styles.readAllBtn, { backgroundColor: tokens.cardBg, borderColor: tokens.borderColor }]}
+              >
+                <CheckCheck color={Colors.ai.primary} size={22} />
+              </TouchableOpacity>
+            )}
           </View>
-          {unreadCount > 0 && (
-            <TouchableOpacity onPress={() => handlePressNotification()}>
-              <Text style={styles.readAllText}>Baca Semua</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </Animated.View>
+        </Animated.View>
 
       {/* ScrollView Content */}
       <ScrollView
@@ -299,9 +310,7 @@ export default function NotificationScreen() {
           notifications.length > 0 ? (
             notifications.map((item, index) => (
               <Animated.View key={item.id} entering={SlideInUp.delay(index * 100).springify()}>
-                <BlurView
-                  intensity={20}
-                  tint={isLightTheme ? 'light' : 'dark'}
+                <View
                   style={[styles.notificationCard, { backgroundColor: tokens.cardBg, borderColor: tokens.borderColor }, !item.read && styles.unreadCard]}
                 >
                   <TouchableOpacity
@@ -345,12 +354,12 @@ export default function NotificationScreen() {
                       </View>
                     </View>
                   </TouchableOpacity>
-                </BlurView>
+                </View>
               </Animated.View>
             ))
           ) : (
             <View style={styles.emptyContainer}>
-              <Bell color={tokens.subTextColor} size={64} opacity={0.2} />
+              <Bell color={tokens.subTextColor} size={64} opacity={0.5} />
               <Text style={[styles.emptyText, { color: tokens.textColor }]}>Tidak ada notifikasi</Text>
               <Text style={[styles.emptySubtext, { color: tokens.subTextColor }]}>
                 Laporan dari mahasiswa atau dosen akan muncul di sini.
@@ -358,44 +367,64 @@ export default function NotificationScreen() {
             </View>
           )
         )}
-      </ScrollView>
+        </ScrollView>
+      </View>
     </AnimatedBackground>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  innerContainer: { flex: 1 },
+  webContainer: {
+    maxWidth: 480,
+    width: '100%',
+    alignSelf: 'center',
+    marginVertical: 20,
+    borderRadius: 30,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 20 },
+    shadowOpacity: 0.15,
+    shadowRadius: 30,
+    elevation: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)'
+  },
   header: {
-    paddingTop: 60,
-    paddingHorizontal: 24,
+    paddingTop: Platform.OS === 'web' ? 20 : Platform.OS === 'ios' ? 60 : 40,
+    paddingHorizontal: 20,
     paddingBottom: 20,
   },
   headerTop: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    justifyContent: 'space-between',
   },
   backBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+    width: 40,
+    height: 40,
     justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
+    alignItems: 'flex-start',
   },
-  headerInfo: { flex: 1 },
+  headerInfo: { flex: 1, paddingLeft: 12 },
   title: {
-    fontSize: 22,
-    fontWeight: 'bold',
+    fontSize: 24,
+    fontWeight: '800',
   },
   subtitle: {
-    fontSize: 12,
-    marginTop: 2,
+    fontSize: 13,
+    marginTop: 4,
+    fontWeight: '500'
   },
-  readAllText: {
-    color: Colors.ai.primary,
-    fontSize: 12,
-    fontWeight: '600',
+  readAllBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
   },
   scrollContent: {
     paddingHorizontal: 20,
@@ -431,9 +460,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 4,
   },
-  titleBold: { fontWeight: '700' },
+  titleBold: { fontWeight: '800' },
   notifTitle: {
-    fontSize: 14,
+    fontSize: 15,
+    fontWeight: '600',
   },
   unreadDot: {
     width: 8,

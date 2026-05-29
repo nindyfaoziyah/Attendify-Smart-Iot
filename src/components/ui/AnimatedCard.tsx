@@ -3,12 +3,12 @@ import {
   View, StyleSheet, ViewStyle, Pressable, StyleProp
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import Animated, {
   FadeInDown, useSharedValue,
   useAnimatedStyle, withSpring
 } from 'react-native-reanimated';
 import { DesignSystem } from '../../../constants/DesignSystem';
+import { useTheme } from '../../context/ThemeContext';
 
 interface AnimatedCardProps {
   children: React.ReactNode;
@@ -29,6 +29,7 @@ export const AnimatedCard: React.FC<AnimatedCardProps> = ({
   delay = 0,
   enableScale = true,
 }) => {
+  const { tokens } = useTheme();
   const scaleValue = useSharedValue(1);
   
   const animatedScaleStyle = useAnimatedStyle(() => ({
@@ -60,10 +61,9 @@ export const AnimatedCard: React.FC<AnimatedCardProps> = ({
       case 'gradient':
         return undefined;
       case 'surface':
-        return DesignSystem.colors.surface;
       case 'glass':
       default:
-        return DesignSystem.colors.glass;
+        return tokens.cardBg;
     }
   };
 
@@ -89,34 +89,25 @@ const getGradientColors = (): readonly [string, string] | readonly [string, stri
           style,
         ]}
       >
-        {variant === 'glass' && (
-          <BlurView intensity={DesignSystem.blur} style={StyleSheet.absoluteFill}>
-            <View
-              style={[
-                StyleSheet.absoluteFill,
-                {
-                  backgroundColor: DesignSystem.colors.glass,
-                  borderColor: DesignSystem.colors.glassBorder,
-                  borderWidth: 1,
-                },
-              ]}
-            />
-          </BlurView>
+        {(variant === 'glass' || variant === 'surface') && (
+          <View
+            style={[
+              StyleSheet.absoluteFill,
+              {
+                backgroundColor: getBackgroundColor(),
+                borderColor: tokens.borderColor,
+                borderWidth: 1,
+                borderRadius: DesignSystem.radius.lg,
+              },
+            ]}
+          />
         )}
         {variant === 'gradient' && (
           <LinearGradient
             colors={getGradientColors()}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
-        )}
-        {variant === 'surface' && (
-          <View
-            style={[
-              StyleSheet.absoluteFill,
-              { backgroundColor: getBackgroundColor() },
-            ]}
+            style={[StyleSheet.absoluteFill, { borderRadius: DesignSystem.radius.lg }]}
           />
         )}
         <View style={styles.content}>{children}</View>
@@ -135,7 +126,6 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: DesignSystem.radius.lg,
     overflow: 'hidden',
-    ...DesignSystem.shadows.card,
   },
   gradientCard: {
     borderWidth: 1,

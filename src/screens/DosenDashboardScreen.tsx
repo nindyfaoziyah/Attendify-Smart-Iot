@@ -104,7 +104,7 @@ export default function DosenDashboardScreen() {
               </View>
             ) : (
               schedules.map((item: any) => (
-                <BlurView key={item.id} intensity={20} tint={isLightTheme ? 'light' : 'dark'} style={[styles.scheduleCard, { backgroundColor: tokens.cardBg, borderColor: tokens.borderColor }]}>
+                <View key={item.id} style={[styles.scheduleCard, { backgroundColor: tokens.cardBg, borderColor: tokens.borderColor }]}>
                   <Text style={[styles.subject, { color: tokens.textColor }]}>{item.subject || 'Mata Kuliah'}</Text>
                   <Text style={[styles.meta, { color: tokens.subTextColor }]}>{item.class_name || '-'} | Ruang: {item.ruang || '-'}</Text>
                   <Text style={[styles.time, { color: isLightTheme ? '#1E4FA8' : '#60A5FA' }]}>{(item.jam_mulai || '00:00')} - {(item.jam_selesai || '00:00')}</Text>
@@ -117,7 +117,7 @@ export default function DosenDashboardScreen() {
                     <Text style={styles.startBtnText}>Masuk Sesi Kelas</Text>
                     <ArrowRight size={16} color="white" />
                   </TouchableOpacity>
-                </BlurView>
+                </View>
               ))
             )}
           </View>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, RefreshControl, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, Send, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react-native';
+import { ChevronLeft, Send, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
 import { Colors } from '@/constants/Colors';
@@ -123,8 +123,8 @@ export default function DosenDailyReportScreen() {
       <SafeAreaView style={{ flex: 1 }}>
         {/* Header */}
         <View style={[styles.header, { backgroundColor: 'transparent', borderBottomColor: tokens.borderColor }]}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { backgroundColor: tokens.iconButtonBg, borderRadius: 14, borderWidth: 1, borderColor: tokens.borderColor, alignItems: 'center' }]}>
-            <ArrowLeft color={tokens.textColor} size={24} />
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <ChevronLeft color={tokens.textColor} size={28} />
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: tokens.textColor }]}>Laporan Absensi Harian</Text>
           <View style={{ width: 40 }} />
@@ -189,7 +189,9 @@ export default function DosenDailyReportScreen() {
         <Text style={[styles.historyTitle, { color: tokens.textColor }]}>Riwayat Laporan Harian Anda</Text>
         
         {reports.length === 0 ? (
-          <Text style={[styles.emptyText, { color: tokens.subTextColor }]}>Belum ada laporan.</Text>
+          <View style={[styles.historyCard, { backgroundColor: tokens.cardBg, borderColor: tokens.borderColor, paddingVertical: 40, alignItems: 'center' }]}>
+            <Text style={[styles.emptyText, { color: tokens.subTextColor, marginTop: 0 }]}>Belum ada laporan.</Text>
+          </View>
         ) : (
           reports.map((item, index) => {
             const badge = getStatusBadge(item.status);
@@ -238,7 +240,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderBottomWidth: 1,
   },
-  backButton: { width: 40, height: 40, justifyContent: 'center' },
+  backButton: { width: 40, height: 40, justifyContent: 'center', alignItems: 'flex-start' },
   headerTitle: { fontSize: 18, fontWeight: '700' },
   scrollContent: { padding: 20, paddingBottom: 100 },
   formCard: {
@@ -280,10 +282,10 @@ const styles = StyleSheet.create({
   historyTitle: { fontSize: 18, fontWeight: '700', marginBottom: 16 },
   emptyText: { textAlign: 'center', marginTop: 20 },
   historyCard: {
-    padding: 16,
-    borderRadius: 12,
+    padding: 24,
+    borderRadius: 20,
     borderWidth: 1,
-    marginBottom: 12,
+    marginBottom: 16,
   },
   historyHeader: {
     flexDirection: 'row',

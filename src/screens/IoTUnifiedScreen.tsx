@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Animated, Platform } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { useTheme } from '../context/ThemeContext';
-import { Cpu, Map, LayoutDashboard, ArrowLeft } from 'lucide-react-native';
+import { Cpu, Map, LayoutDashboard } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import AnimatedBackground from '../components/ui/AnimatedBackground';
 
@@ -21,9 +22,9 @@ export default function IoTUnifiedScreen() {
   const [activeTab, setActiveTab] = useState<TabKey>('sensor');
 
   const tabs = [
-    { key: 'sensor', label: 'Live Monitoring', icon: Cpu },
-    { key: 'map', label: 'Live Attendance Map', icon: Map },
-    { key: 'analytics', label: 'Analytics Command Center', icon: LayoutDashboard },
+    { key: 'sensor', label: 'Validasi', icon: Cpu },
+    { key: 'map', label: 'Peta', icon: Map },
+    { key: 'analytics', label: 'Statistik', icon: LayoutDashboard },
   ];
 
   return (
@@ -36,22 +37,22 @@ export default function IoTUnifiedScreen() {
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 12 }}>
           <TouchableOpacity 
             onPress={() => navigation.goBack()}
-            style={[styles.backBtn, { backgroundColor: tokens.iconButtonBg }]}
+            style={{ padding: 8, marginLeft: -8 }}
           >
-            <ArrowLeft color={tokens.textColor} size={24} />
+            <Ionicons name="chevron-back" color={tokens.textColor} size={24} />
           </TouchableOpacity>
           <Text style={[styles.mainTitle, { color: tokens.textColor, marginBottom: 0 }]}>IoT Sensor</Text>
         </View>
         
         <View style={styles.segmentContainer}>
-          <BlurView intensity={30} tint={isLightTheme ? 'light' : 'dark'} style={[styles.segmentBg, { borderColor: tokens.borderColor, backgroundColor: tokens.cardBg }]}>
+          <View style={[styles.segmentBg, { borderColor: 'rgba(255,255,255,0.1)', backgroundColor: isLightTheme ? '#F3F4F6' : '#1E293B' }]}>
             {tabs.map((tab) => {
               const isActive = activeTab === tab.key;
               const Icon = tab.icon;
               return (
                 <TouchableOpacity 
                   key={tab.key} 
-                  style={[styles.segmentBtn, isActive && [styles.segmentBtnActive, { backgroundColor: isLightTheme ? '#fff' : 'rgba(255,255,255,0.1)' }]]}
+                  style={[styles.segmentBtn, isActive && [styles.segmentBtnActive, { backgroundColor: isLightTheme ? '#FFFFFF' : 'rgba(59,130,246,0.2)' }]]}
                   onPress={() => setActiveTab(tab.key as TabKey)}
                 >
                   <Icon size={16} color={isActive ? '#3B82F6' : tokens.subTextColor} />
@@ -61,7 +62,7 @@ export default function IoTUnifiedScreen() {
                 </TouchableOpacity>
               )
             })}
-          </BlurView>
+          </View>
         </View>
       </View>
 
@@ -114,11 +115,6 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   segmentBtnActive: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
   },
   segmentText: {
     fontSize: 12,

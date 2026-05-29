@@ -26,6 +26,15 @@ exports.recognizeFromIoT = async (req, res) => {
       });
     }
 
+    // Bersihkan prefix data URI (misal: data:image/jpeg;base64,) jika ada
+    let cleanImage = image;
+    if (image.includes('base64,')) {
+      cleanImage = image.split('base64,')[1];
+    }
+    
+    // Gunakan cleanImage untuk size check
+    const imageSizeKB = Buffer.byteLength(cleanImage, 'base64') / 1024;
+
     if (mode !== 'auto' && mode !== 'manual') {
       return res.status(400).json({
         status: 'error',
@@ -34,7 +43,6 @@ exports.recognizeFromIoT = async (req, res) => {
     }
 
     // Validate image size (max 5MB)
-    const imageSizeKB = Buffer.byteLength(image, 'base64') / 1024;
     if (imageSizeKB > 5120) {
       return res.status(400).json({
         status: 'error',
@@ -85,7 +93,7 @@ exports.recognizeFromIoT = async (req, res) => {
     const filePath = path.join(imagesDir, fileName);
     
     try {
-      fs.writeFileSync(filePath, Buffer.from(image, 'base64'));
+      fs.writeFileSync(filePath, Buffer.from(cleanImage, 'base64'));
       console.log(`[IoT] Image saved: ${fileName}`);
     } catch (saveError) {
       console.warn(`[IoT] Failed to save image: ${saveError.message}`);
@@ -95,8 +103,8 @@ exports.recognizeFromIoT = async (req, res) => {
     // TODO: Integrate with actual face recognition library (e.g., face-api.js, OpenCV, etc.)
     // For now, using a simple matching algorithm based on device and timing
     
-    const recognitionOutput = await performFaceRecognition(image, device_id);
-    const { matchedUser, matchResult, ioData } = recognitionOutput;
+    const recognitionOutput = await performFaceRecognition(cleanImage, device_id);
+    const { matchedUsers, matchResult } = recognitionOutput;
     
     // We can emit health event periodically or on every request
     const io = req.app.get('io');
@@ -108,7 +116,7 @@ exports.recognizeFromIoT = async (req, res) => {
         });
     }
 
-    if (!matchedUser || !matchResult.success) {
+    if (!matchedUsers || matchedUsers.length === 0 || !matchResult.success) {
       if (matchResult && matchResult.spoof) {
           // Log suspicious activity
           await db.query(
@@ -135,61 +143,6 @@ exports.recognizeFromIoT = async (req, res) => {
       });
     }
 
-    // Determine approval status based on confidence
-    const confidencePct = matchResult.confidence * 100;
-    let approvalStatus = 'APPROVED';
-    if (confidencePct < 50) {
-        approvalStatus = 'REJECTED';
-    } else if (confidencePct >= 50 && confidencePct < 70) {
-        approvalStatus = 'REVIEW_REQUIRED';
-    }
-
-    // ── MANUAL MODE PERMISSION CHECK (NEW) ──────────
-    let manualMode = 0;
-    if (mode === 'manual') {
-      const [permissions] = await db.query(
-        `SELECT id_permission FROM manual_scan_permission 
-         WHERE user_id = ? AND enabled = 1 AND (expires_at IS NULL OR expires_at > NOW())`,
-        [matchedUser.id_user]
-      );
-      
-      if (permissions.length === 0) {
-        await logIotActivity(device_id, 'manual_denied', matchedUser.id_user, 'no_active_permission');
-        return res.status(403).json({
-          status: 'manual_denied',
-          message: 'Manual scan not permitted by dosen'
-        });
-      }
-      
-      manualMode = 1;
-      console.log(`[ManualScan] Permission OK for user ${matchedUser.id_user}`);
-    }
-
-    // ── Check if user already scanned today ─────────
-    const [existingAbsensi] = await db.query(
-      `SELECT id_absensi FROM absensi 
-       WHERE user_id = ? 
-       AND jadwal_id = (
-         SELECT id_jadwal FROM jadwal_kuliah 
-         WHERE CURRENT_TIME() BETWEEN jam_mulai AND jam_selesai 
-         LIMIT 1
-       )
-       AND DATE(tanggal) = CURDATE()`,
-      [matchedUser.id_user]
-    );
-
-    if (existingAbsensi.length > 0) {
-      // Log duplicate scan
-      await logIotActivity(device_id, 'duplicate', matchedUser.id_user, 'already_scanned_today');
-      
-      return res.json({
-        status: 'duplicate',
-        message: `User ${matchedUser.nama} already scanned today`,
-        user_id: matchedUser.id_user,
-        name: matchedUser.nama
-      });
-    }
-
     // ── Find active schedule ────────────────────────
     const [activeJadwal] = await db.query(
       `SELECT id_jadwal, jam_mulai 
@@ -198,160 +151,207 @@ exports.recognizeFromIoT = async (req, res) => {
        LIMIT 1`
     );
 
-    if (activeJadwal.length === 0) {
-      // Log: no active schedule
-      await logIotActivity(device_id, 'no_schedule', matchedUser.id_user, 'no_active_schedule');
-      
-      return res.json({
-        status: 'no_schedule',
-        message: 'No active class schedule at this time',
-        user_id: matchedUser.id_user,
-        name: matchedUser.nama
-      });
-    }
-
-    // ── Determine attendance status ─────────────────
-    const jadwalId = activeJadwal[0].id_jadwal;
-    const jamMulai = new Date(`1970-01-01T${activeJadwal[0].jam_mulai}Z`);
-    const waktuAbsen = new Date(`1970-01-01T${new Date().toTimeString().split(' ')[0]}Z`);
-    
-    let statusAbsen = 'hadir';
-    if (waktuAbsen > new Date(jamMulai.getTime() + 15 * 60000)) {
-      statusAbsen = 'terlambat';
-    }
-
     const lat = req.body.latitude || '-6.200000';
     const lng = req.body.longitude || '106.816666';
     const locName = req.body.location_name || 'Gedung Utama (IoT)';
 
-    // ── Insert attendance record ────────────────────
-    await db.query(
-      `INSERT INTO absensi (user_id, jadwal_id, tanggal, waktu_datang, status, manual_mode, keterangan) 
-       VALUES (?, ?, NOW(), CURTIME(), ?, ?, ?)`,
-      [matchedUser.id_user, jadwalId, statusAbsen, manualMode, 'Hadir via AI (ESP32-CAM)']
-    );
+    let responseResults = [];
 
-    // ── Create notifications ────────────────────────────────────────
-    try {
-      const waktuLabel = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-      const statusLabel = statusAbsen === 'hadir' ? 'Hadir' : 'Terlambat';
-      const modeLabel = manualMode ? 'scan manual' : 'IoT otomatis';
+    // Process attendance for ALL recognized faces
+    for (const matchedUser of matchedUsers) {
+        const { matchInfo } = matchedUser;
+        
+        // Determine approval status based on confidence
+        const confidencePct = matchInfo.confidence * 100;
+        let approvalStatus = 'APPROVED';
+        if (confidencePct < 50) {
+            approvalStatus = 'REJECTED';
+        } else if (confidencePct >= 50 && confidencePct < 70) {
+            approvalStatus = 'REVIEW_REQUIRED';
+        }
 
-      // 1. Notifikasi ke MAHASISWA yang bersangkutan
-      await db.query(
-        `INSERT INTO notifications (receiver_user_id, sender_user_id, type, title, message, is_read)
-         VALUES (?, NULL, 'ATTENDANCE_SUCCESS', 'Absensi Berhasil', ?, FALSE)`,
-        [matchedUser.id_user, `${statusLabel} — Kehadiranmu pukul ${waktuLabel} berhasil dicatat via ${modeLabel}.`]
-      );
+        // ── MANUAL MODE PERMISSION CHECK (NEW) ──────────
+        let manualMode = 0;
+        if (mode === 'manual') {
+          const [permissions] = await db.query(
+            `SELECT id FROM manual_scan_permission 
+             WHERE user_id = ? AND enabled = 1 AND (expires_at IS NULL OR expires_at > NOW())`,
+            [matchedUser.id_user]
+          );
+          
+          if (permissions.length === 0) {
+            await logIotActivity(device_id, 'manual_denied', matchedUser.id_user, 'no_active_permission');
+            responseResults.push({ status: 'manual_denied', user_id: matchedUser.id_user, name: matchedUser.nama, message: 'Manual scan not permitted by dosen' });
+            continue;
+          }
+          
+          manualMode = 1;
+          console.log(`[ManualScan] Permission OK for user ${matchedUser.id_user}`);
+        }
 
-      // 2. Notifikasi ke DOSEN pengajar jadwal aktif
-      const [jadwalInfo] = await db.query(
-        `SELECT j.dosen_id, m.nama_mk FROM jadwal_kuliah j
-         JOIN mata_kuliah m ON j.mata_kuliah_id = m.id_mk
-         WHERE j.id_jadwal = ?`, [jadwalId]
-      );
-      if (jadwalInfo.length > 0) {
-        const { dosen_id, nama_mk } = jadwalInfo[0];
-        await db.query(
-          `INSERT INTO notifications (receiver_user_id, sender_user_id, type, title, message, is_read)
-           VALUES (?, ?, 'ATTENDANCE_SUCCESS', 'Mahasiswa Hadir', ?, FALSE)`,
-          [dosen_id, matchedUser.id_user, `${matchedUser.nama} hadir di kelas ${nama_mk} pukul ${waktuLabel} (${statusLabel}).`]
+        if (activeJadwal.length === 0) {
+          await logIotActivity(device_id, 'no_schedule', matchedUser.id_user, 'no_active_schedule');
+          responseResults.push({
+            status: 'no_schedule',
+            message: 'No active class schedule at this time',
+            user_id: matchedUser.id_user,
+            name: matchedUser.nama
+          });
+          continue;
+        }
+
+        // ── Check if user already scanned today ─────────
+        const [existingAbsensi] = await db.query(
+          `SELECT id_absensi FROM absensi 
+           WHERE user_id = ? 
+           AND jadwal_id = ?
+           AND DATE(tanggal) = CURDATE()`,
+          [matchedUser.id_user, activeJadwal[0].id_jadwal]
         );
-      }
 
-      // 3. Notifikasi ke ADMIN
-      const [admins] = await db.query(`SELECT id_user FROM pengguna WHERE role = 'admin' LIMIT 1`);
-      if (admins.length > 0) {
+        if (existingAbsensi.length > 0) {
+          await logIotActivity(device_id, 'duplicate', matchedUser.id_user, 'already_scanned_today');
+          responseResults.push({
+            status: 'duplicate',
+            message: `User ${matchedUser.nama} already scanned today`,
+            user_id: matchedUser.id_user,
+            name: matchedUser.nama
+          });
+          continue;
+        }
+
+        // ── Determine attendance status ─────────────────
+        const jadwalId = activeJadwal[0].id_jadwal;
+        const jamMulai = new Date(`1970-01-01T${activeJadwal[0].jam_mulai}Z`);
+        const waktuAbsen = new Date(`1970-01-01T${new Date().toTimeString().split(' ')[0]}Z`);
+        
+        let statusAbsen = 'hadir';
+        if (waktuAbsen > new Date(jamMulai.getTime() + 15 * 60000)) {
+          statusAbsen = 'terlambat';
+        }
+
+        // ── Insert attendance record ────────────────────
         await db.query(
-          `INSERT INTO notifications (receiver_user_id, sender_user_id, type, title, message, is_read)
-           VALUES (?, ?, 'ATTENDANCE_SUCCESS', 'Rekap Absensi', ?, FALSE)`,
-          [admins[0].id_user, matchedUser.id_user, `${matchedUser.nama} tercatat ${statusLabel} via ${modeLabel} pukul ${waktuLabel}.`]
+          `INSERT INTO absensi (user_id, jadwal_id, tanggal, waktu_datang, status, manual_mode, keterangan) 
+           VALUES (?, ?, NOW(), CURTIME(), ?, ?, ?)`,
+          [matchedUser.id_user, jadwalId, statusAbsen, manualMode, 'Hadir via AI (ESP32-CAM)']
         );
-      }
-    } catch (notifErr) {
-      console.warn('[IoT] Notifikasi gagal dikirim:', notifErr.message);
-    }
 
-    // ── DISABLE MANUAL PERMISSION after success ─────
-    if (manualMode === 1) {
-      await db.query(
-        `UPDATE manual_scan_permission 
-         SET enabled = 0 
-         WHERE user_id = ? AND enabled = 1`,
-        [matchedUser.id_user]
-      );
-      console.log(`[ManualScan] Auto-disabled permission for user ${matchedUser.id_user}`);
-    }
+        // ── Create notifications ────────────────────────────────────────
+        try {
+          const waktuLabel = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+          const statusLabel = statusAbsen === 'hadir' ? 'Hadir' : 'Terlambat';
+          const modeLabel = manualMode ? 'scan wajah manual' : 'alat IoT otomatis';
 
-    // ── Log successful scan ─────────────────────────
-    await logIotActivity(
-      device_id,
-      'matched',
-      matchedUser.id_user,
-      statusAbsen + (manualMode ? ' (manual)' : '')
-    );
+          await db.query(
+            `INSERT INTO notifications (receiver_user_id, sender_user_id, type, title, message, is_read)
+             VALUES (?, NULL, 'ATTENDANCE_SUCCESS', 'Absensi Berhasil', ?, FALSE)`,
+            [matchedUser.id_user, `${statusLabel} — Kehadiranmu pukul ${waktuLabel} berhasil dicatat via ${modeLabel}.`]
+          );
 
-    // ── Emit Realtime Event via Socket.io ───────────
-    const attendanceData = {
-      success: approvalStatus !== 'REJECTED',
-      recognized: true,
-      user_id: matchedUser.id_user,
-      name: matchedUser.nama,
-      kelas: matchedUser.kelas || 'Umum',
-      photo: fileName,
-      attendance_status: statusAbsen,
-      approval_status: approvalStatus,
-      confidence: confidencePct,
-      mode: mode,
-      device_id: device_id,
-      timestamp: new Date().toISOString(),
-      latitude: parseFloat(lat),
-      longitude: parseFloat(lng),
-      location_name: locName
-    };
-    if (io) {
-        // ── Dosen Dashboard: new_attendance feed ──────────────────────
-        io.emit('new_attendance', attendanceData);
+          const [jadwalInfo] = await db.query(
+            `SELECT j.dosen_id, m.nama_mk FROM jadwal_kuliah j
+             JOIN mata_kuliah m ON j.mata_kuliah_id = m.id_mk
+             WHERE j.id_jadwal = ?`, [jadwalId]
+          );
+          if (jadwalInfo.length > 0) {
+            const { dosen_id, nama_mk } = jadwalInfo[0];
+            await db.query(
+              `INSERT INTO notifications (receiver_user_id, sender_user_id, type, title, message, is_read)
+               VALUES (?, ?, 'ATTENDANCE_SUCCESS', 'Mahasiswa Hadir', ?, FALSE)`,
+              [dosen_id, matchedUser.id_user, `${matchedUser.nama} hadir di kelas ${nama_mk} pukul ${waktuLabel} (${statusLabel}).`]
+            );
+          }
 
-        // ── General attendance success ────────────────────────────────
-        io.emit('ATTENDANCE_SUCCESS', attendanceData);
+          const [admins] = await db.query(`SELECT id_user FROM pengguna WHERE role = 'admin' LIMIT 1`);
+          if (admins.length > 0) {
+            await db.query(
+              `INSERT INTO notifications (receiver_user_id, sender_user_id, type, title, message, is_read)
+               VALUES (?, ?, 'ATTENDANCE_SUCCESS', 'Rekap Absensi', ?, FALSE)`,
+              [admins[0].id_user, matchedUser.id_user, `${matchedUser.nama} tercatat ${statusLabel} via ${modeLabel} pukul ${waktuLabel}.`]
+            );
+          }
+        } catch (notifErr) {
+          console.warn('[IoT] Notifikasi gagal dikirim:', notifErr.message);
+        }
 
-        // ── NEW_ATTENDANCE: for live admin/dosen attendance count update
-        io.emit('NEW_ATTENDANCE', {
-            ...attendanceData,
-            status_label: statusAbsen === 'hadir' ? '✅ Hadir' : '⏰ Terlambat',
-            approval_label:
-                approvalStatus === 'APPROVED' ? 'Disetujui'
-                : approvalStatus === 'REVIEW_REQUIRED' ? 'Menunggu Review'
-                : 'Ditolak'
-        });
+        // ── DISABLE MANUAL PERMISSION after success ─────
+        if (manualMode === 1) {
+          await db.query(
+            `UPDATE manual_scan_permission 
+             SET enabled = 0 
+             WHERE user_id = ? AND enabled = 1`,
+            [matchedUser.id_user]
+          );
+        }
 
-        // ── FACE_VERIFIED: targeted update for the recognised mahasiswa
-        // The frontend listens and shows the absensi confirmation card
-        io.emit('FACE_VERIFIED', {
-            user_id:          matchedUser.id_user,
-            name:             matchedUser.nama,
-            kelas:            matchedUser.kelas || '-',
-            confidence:       confidencePct,
-            confidence_label: `${confidencePct.toFixed(1)}%`,
-            attendance_status: statusAbsen,
-            status_label:     statusAbsen === 'hadir' ? '✅ Absensi Berhasil' : '⏰ Terlambat',
-            approval_status:  approvalStatus,
-            location_name:    locName,
-            latitude:         parseFloat(lat),
-            longitude:        parseFloat(lng),
-            timestamp:        new Date().toISOString(),
-            device_id:        device_id,
-            mode:             mode,
-            photo:            fileName
+        await logIotActivity(
+          device_id,
+          'matched',
+          matchedUser.id_user,
+          statusAbsen + (manualMode ? ' (manual)' : '')
+        );
+
+        // ── Emit Realtime Event via Socket.io ───────────
+        const attendanceData = {
+          success: approvalStatus !== 'REJECTED',
+          recognized: true,
+          user_id: matchedUser.id_user,
+          name: matchedUser.nama,
+          kelas: matchedUser.kelas || 'Umum',
+          photo: fileName,
+          attendance_status: statusAbsen,
+          approval_status: approvalStatus,
+          confidence: confidencePct,
+          mode: mode,
+          device_id: device_id,
+          timestamp: new Date().toISOString(),
+          latitude: parseFloat(lat),
+          longitude: parseFloat(lng),
+          location_name: locName
+        };
+        if (io) {
+            io.emit('new_attendance', attendanceData);
+            io.emit('ATTENDANCE_SUCCESS', attendanceData);
+            io.emit('NEW_ATTENDANCE', {
+                ...attendanceData,
+                status_label: statusAbsen === 'hadir' ? '✅ Hadir' : '⏰ Terlambat',
+                approval_label:
+                    approvalStatus === 'APPROVED' ? 'Disetujui'
+                    : approvalStatus === 'REVIEW_REQUIRED' ? 'Menunggu Review'
+                    : 'Ditolak'
+            });
+            io.emit('FACE_VERIFIED', {
+                user_id:          matchedUser.id_user,
+                name:             matchedUser.nama,
+                kelas:            matchedUser.kelas || '-',
+                confidence:       confidencePct,
+                confidence_label: `${confidencePct.toFixed(1)}%`,
+                attendance_status: statusAbsen,
+                status_label:     statusAbsen === 'hadir' ? '✅ Absensi Berhasil' : '⏰ Terlambat',
+                approval_status:  approvalStatus,
+                location_name:    locName,
+                latitude:         parseFloat(lat),
+                longitude:        parseFloat(lng),
+                timestamp:        new Date().toISOString(),
+                device_id:        device_id,
+                mode:             mode,
+                photo:            fileName
+            });
+        }
+
+        responseResults.push({
+          status: 'matched',
+          message: 'Attendance recorded successfully',
+          ...attendanceData
         });
     }
 
     // ── Success response ────────────────────────────
     return res.json({
-      status: 'matched',
-      message: 'Attendance recorded successfully',
-      ...attendanceData
+      status: 'success',
+      message: `Processed ${matchedUsers.length} faces`,
+      results: responseResults
     });
 
   } catch (error) {
@@ -376,17 +376,6 @@ exports.recognizeFromIoT = async (req, res) => {
   }
 };
 
-/**
- * Perform face recognition using image data
- * TODO: Replace with actual face recognition library
- * 
- * Current implementation: Placeholder for future ML integration
- * Options:
- *  - face-api.js
- *  - OpenCV
- *  - TensorFlow.js with face detection
- *  - AWS Rekognition
- */
 async function performFaceRecognition(base64Image, deviceId) {
   try {
     const buffer = Buffer.from(base64Image, 'base64');
@@ -400,32 +389,36 @@ async function performFaceRecognition(base64Image, deviceId) {
 
     const matchResult = await faceService.recognizeFace(buffer, registeredProfiles);
 
-    if (!matchResult.success) {
+    if (!matchResult.success || !matchResult.matches || matchResult.matches.length === 0) {
         console.log('[IoT] Face recognition failed/spoof:', matchResult.message);
-        return { matchedUser: null, matchResult };
+        return { matchedUsers: [], matchResult };
     }
 
-    const matchedUserId = matchResult.user_id;
-    console.log(`[IoT] Match Found! User ID: ${matchedUserId}, Confidence: ${(matchResult.confidence * 100).toFixed(1)}%`);
+    console.log(`[IoT] Match Found! ${matchResult.matches.length} faces recognized.`);
 
-    // Fetch user details including class
-    const [users] = await db.query(
-      `SELECT p.id_user, p.nama, IFNULL(k.nama_kelas, '-') as kelas 
-       FROM pengguna p 
-       LEFT JOIN mahasiswa_kelas mk ON p.id_user = mk.mahasiswa_id 
-       LEFT JOIN kelas k ON mk.kelas_id = k.id_kelas 
-       WHERE p.id_user = ?`,
-      [matchedUserId]
-    );
+    let matchedUsers = [];
+    
+    for (const match of matchResult.matches) {
+        // Fetch user details including class
+        const [users] = await db.query(
+          `SELECT p.id_user, p.nama, IFNULL(k.nama_kelas, '-') as kelas 
+           FROM pengguna p 
+           LEFT JOIN mahasiswa_kelas mk ON p.id_user = mk.mahasiswa_id 
+           LEFT JOIN kelas k ON mk.kelas_id = k.id_kelas 
+           WHERE p.id_user = ?`,
+          [match.user_id]
+        );
 
-    if (users.length > 0) {
-      return { matchedUser: users[0], matchResult };
+        if (users.length > 0) {
+            matchedUsers.push({ ...users[0], matchInfo: match });
+            console.log(`[IoT] Recognized User ID: ${match.user_id}, Confidence: ${(match.confidence * 100).toFixed(1)}%`);
+        }
     }
 
-    return { matchedUser: null, matchResult: { success: false, message: 'User not found in DB' } };
+    return { matchedUsers, matchResult };
   } catch (error) {
     console.error('[IoT] Face recognition error:', error);
-    return { matchedUser: null, matchResult: { success: false, message: error.message } };
+    return { matchedUsers: [], matchResult: { success: false, message: error.message } };
   }
 }
 

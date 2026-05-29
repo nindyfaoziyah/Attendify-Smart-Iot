@@ -29,12 +29,12 @@ export interface ThemeTokens {
 
 const DARK_TOKENS: ThemeTokens = {
   textColor: '#ffffff',
-  subTextColor: 'rgba(255,255,255,0.55)',
-  labelColor: 'rgba(255,255,255,0.4)',
-  cardBg: 'rgba(255,255,255,0.08)',
-  borderColor: 'rgba(255,255,255,0.1)',
-  inputBg: 'rgba(255,255,255,0.07)',
-  iconButtonBg: 'rgba(255,255,255,0.1)',
+  subTextColor: 'rgba(255,255,255,0.7)',
+  labelColor: 'rgba(255,255,255,0.5)',
+  cardBg: 'rgba(0,0,0,0.3)',
+  borderColor: 'rgba(255,255,255,0.15)',
+  inputBg: 'rgba(0,0,0,0.25)',
+  iconButtonBg: 'rgba(0,0,0,0.2)',
 };
 
 const LIGHT_TOKENS: ThemeTokens = {

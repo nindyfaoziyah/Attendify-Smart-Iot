@@ -21,7 +21,8 @@ interface CreateAccountScreenProps {
 
 export default function CreateAccountScreen({ navigation }: CreateAccountScreenProps) {
   const { login } = useAuth();
-  const { tokens, isLightTheme } = useTheme();
+  const { tokens, isLightTheme, themeColors } = useTheme();
+  const themePrimary = themeColors && themeColors.length > 0 ? themeColors[Math.min(1, themeColors.length - 1)] : Colors.attendify.primary;
   const role = 'mahasiswa';
   const [formData, setFormData] = useState({
     fullName: '',
@@ -191,7 +192,7 @@ export default function CreateAccountScreen({ navigation }: CreateAccountScreenP
           <View style={styles.inputWrapper}>
             {/* Full Name */}
             <View style={[styles.inputContainer, { backgroundColor: tokens.inputBg, borderColor: tokens.borderColor }, errors.fullName && styles.inputContainerError]}>
-              <User size={20} color={isLightTheme ? '#1E4FA8' : '#60a5fa'} style={styles.inputIcon} />
+              <User size={20} color={themePrimary} style={styles.inputIcon} />
               <TextInput
                 style={[styles.input, { color: tokens.textColor }]}
                 placeholder="Nama Lengkap"
@@ -205,7 +206,7 @@ export default function CreateAccountScreen({ navigation }: CreateAccountScreenP
 
             {/* NIM/NIP */}
             <View style={[styles.inputContainer, { backgroundColor: tokens.inputBg, borderColor: tokens.borderColor }, errors.identifier && styles.inputContainerError]}>
-              <IdCard size={20} color={isLightTheme ? '#1E4FA8' : '#60a5fa'} style={styles.inputIcon} />
+              <IdCard size={20} color={themePrimary} style={styles.inputIcon} />
               <TextInput
                 style={[styles.input, { color: tokens.textColor }]}
                 placeholder={role === 'mahasiswa' ? 'NIM' : role === 'dosen' ? 'NIP' : 'Username'}
@@ -219,7 +220,7 @@ export default function CreateAccountScreen({ navigation }: CreateAccountScreenP
 
             {/* Email */}
             <View style={[styles.inputContainer, { backgroundColor: tokens.inputBg, borderColor: tokens.borderColor }, errors.email && styles.inputContainerError]}>
-              <Mail size={20} color={isLightTheme ? '#1E4FA8' : '#60a5fa'} style={styles.inputIcon} />
+              <Mail size={20} color={themePrimary} style={styles.inputIcon} />
               <TextInput
                 style={[styles.input, { color: tokens.textColor }]}
                 placeholder="Email"
@@ -235,7 +236,7 @@ export default function CreateAccountScreen({ navigation }: CreateAccountScreenP
 
             {/* Phone (Optional) */}
             <View style={[styles.inputContainer, { backgroundColor: tokens.inputBg, borderColor: tokens.borderColor }, errors.phone && styles.inputContainerError]}>
-              <Phone size={20} color={isLightTheme ? '#1E4FA8' : '#60a5fa'} style={styles.inputIcon} />
+              <Phone size={20} color={themePrimary} style={styles.inputIcon} />
               <TextInput
                 style={[styles.input, { color: tokens.textColor }]}
                 placeholder="Nomor Telepon (Opsional)"
@@ -252,7 +253,7 @@ export default function CreateAccountScreen({ navigation }: CreateAccountScreenP
             {role === 'mahasiswa' && (
               <>
                 <View style={[styles.inputContainer, { backgroundColor: tokens.inputBg, borderColor: tokens.borderColor }, errors.prodi && styles.inputContainerError]}>
-                  <GraduationCap size={20} color={isLightTheme ? '#1E4FA8' : '#60a5fa'} style={styles.inputIcon} />
+                  <GraduationCap size={20} color={themePrimary} style={styles.inputIcon} />
                   <TextInput
                     style={[styles.input, { color: tokens.textColor }]}
                     placeholder="Program Studi (Opsional)"
@@ -270,7 +271,7 @@ export default function CreateAccountScreen({ navigation }: CreateAccountScreenP
             {role === 'mahasiswa' && (
               <>
                 <View style={[styles.inputContainer, { backgroundColor: tokens.inputBg, borderColor: tokens.borderColor }, errors.kelas && styles.inputContainerError]}>
-                  <Users size={20} color={isLightTheme ? '#1E4FA8' : '#60a5fa'} style={styles.inputIcon} />
+                  <Users size={20} color={themePrimary} style={styles.inputIcon} />
                   <TextInput
                     style={[styles.input, { color: tokens.textColor }]}
                     placeholder="Kelas (Opsional)"
@@ -286,7 +287,7 @@ export default function CreateAccountScreen({ navigation }: CreateAccountScreenP
 
             {/* Password */}
             <View style={[styles.inputContainer, { backgroundColor: tokens.inputBg, borderColor: tokens.borderColor }, errors.password && styles.inputContainerError]}>
-              <Lock size={20} color={isLightTheme ? '#1E4FA8' : '#60a5fa'} style={styles.inputIcon} />
+              <Lock size={20} color={themePrimary} style={styles.inputIcon} />
               <TextInput
                 style={[styles.input, { color: tokens.textColor }]}
                 placeholder="Password"
@@ -308,7 +309,7 @@ export default function CreateAccountScreen({ navigation }: CreateAccountScreenP
 
             {/* Confirm Password */}
             <View style={[styles.inputContainer, { backgroundColor: tokens.inputBg, borderColor: tokens.borderColor }, errors.confirmPassword && styles.inputContainerError]}>
-              <Lock size={20} color={isLightTheme ? '#1E4FA8' : '#60a5fa'} style={styles.inputIcon} />
+              <Lock size={20} color={themePrimary} style={styles.inputIcon} />
               <TextInput
                 style={[styles.input, { color: tokens.textColor }]}
                 placeholder="Konfirmasi Password"
@@ -336,7 +337,7 @@ export default function CreateAccountScreen({ navigation }: CreateAccountScreenP
             disabled={isLoading}
           >
             <LinearGradient
-              colors={isLightTheme ? ['#1E4FA8', '#2D6CDF'] : [Colors.attendify.primary, Colors.attendify.secondary]}
+              colors={isLightTheme ? [themePrimary, themePrimary] : [themePrimary, themePrimary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.buttonGradient}
@@ -355,14 +356,14 @@ export default function CreateAccountScreen({ navigation }: CreateAccountScreenP
           {/* Terms & Conditions */}
           <Text style={[styles.termsText, { color: tokens.subTextColor }]}>
             By creating an account, you agree to our{' '}
-            <Text style={[styles.termsLink, { color: isLightTheme ? '#1E4FA8' : '#60a5fa' }]}>Terms & Conditions</Text>
+            <Text style={[styles.termsLink, { color: isLightTheme ? themePrimary : '#60A5FA' }]}>Terms & Conditions</Text>
           </Text>
 
           {/* Sign In Link */}
           <View style={styles.signInContainer}>
             <Text style={[styles.signInText, { color: tokens.subTextColor }]}>Already have an account? </Text>
             <TouchableOpacity onPress={() => navigation.goBack()} disabled={isLoading}>
-              <Text style={[styles.signInLink, { color: isLightTheme ? '#1E4FA8' : '#60a5fa' }]}>Sign In</Text>
+              <Text style={[styles.signInLink, { color: isLightTheme ? themePrimary : '#60A5FA' }]}>Sign In</Text>
             </TouchableOpacity>
           </View>
 

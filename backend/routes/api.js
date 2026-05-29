@@ -100,7 +100,8 @@ router.post('/absensi/scan', absensiCtrl.scanWajah);
 router.post('/trigger-scan', absensiCtrl.triggerScan);
 router.post('/absensi/finish', auth, roleCheck('dosen', 'admin'), absensiCtrl.finishClass);
 router.get('/absensi', auth, absensiCtrl.getAllAbsensi);
-router.get('/absensi/:mahasiswa_id', auth, absensiCtrl.getAbsensiByMahasiswa);
+router.get('/absensi/:user_id', auth, absensiCtrl.getAbsensiByMahasiswa);
+router.get('/dashboard/stats/:user_id', auth, absensiCtrl.getDashboardStats);
 router.post('/absensi/update', auth, roleCheck('dosen', 'admin'), absensiCtrl.updateAttendanceStatus);
 router.get('/admin/attendance', auth, roleCheck('admin'), absensiCtrl.getAdminAttendance);
 router.put('/absensi/:id/validate', auth, roleCheck('dosen', 'admin'), absensiCtrl.validateAttendance);
@@ -111,6 +112,7 @@ router.put('/absensi/:id/validate', auth, roleCheck('dosen', 'admin'), absensiCt
 router.get('/reports/absensi', auth, roleCheck('admin', 'dosen'), reportCtrl.exportAttendance);
 router.get('/reports/excel', reportCtrl.exportExcel);
 router.get('/reports/pdf', reportCtrl.exportPDF);
+router.get('/reports/schedule-stats', auth, reportCtrl.getScheduleReportStats);
 
 // System/General Issue Reports
 router.post('/reports', auth, reportCtrl.createSystemReport);

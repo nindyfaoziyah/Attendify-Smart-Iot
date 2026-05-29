@@ -197,10 +197,14 @@ exports.deleteStudent = async (req, res) => {
         await connection.query('DELETE FROM face_training_logs WHERE user_id = ?', [id]);
         await connection.query('DELETE FROM manual_scan_permission WHERE user_id = ?', [id]);
         await connection.query('DELETE FROM absensi WHERE user_id = ?', [id]);
-        await connection.query('DELETE FROM notifications WHERE receiver_user_id = ? OR sender_user_id = ?', [id, id]);
+        await connection.query('DELETE FROM notifikasi WHERE user_id = ?', [id]);
+        await connection.query('DELETE FROM log_deteksi WHERE user_id = ?', [id]);
+        await connection.query('DELETE FROM reports WHERE sender_user_id = ?', [id]);
 
         // Hapus dari tabel pengguna
+        await connection.query('SET FOREIGN_KEY_CHECKS = 0');
         await connection.query('DELETE FROM pengguna WHERE id_user = ?', [id]);
+        await connection.query('SET FOREIGN_KEY_CHECKS = 1');
 
         await connection.commit();
         res.json({ status: 'success', message: 'Mahasiswa berhasil dihapus' });

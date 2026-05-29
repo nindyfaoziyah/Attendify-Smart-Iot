@@ -9,6 +9,7 @@ import { API_URL } from '@/constants/Config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSocket } from '../context/SocketContext';
 import AnimatedBackground from '../components/ui/AnimatedBackground';
+import AppModal from '../components/ui/AppModal';
 
 export default function LaporanMasalahScreen() {
   const navigation = useNavigation();
@@ -22,6 +23,7 @@ export default function LaporanMasalahScreen() {
   const [category, setCategory] = useState('');
   const [location, setLocation] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const fetchReports = async () => {
     try {
@@ -91,11 +93,7 @@ export default function LaporanMasalahScreen() {
       });
       const data = await response.json();
       if (data?.status === 'success') {
-        if (Platform.OS === 'web') {
-          window.alert('Laporan berhasil dikirim!');
-        } else {
-          Alert.alert('Sukses', 'Laporan berhasil dikirim!');
-        }
+        setShowSuccessModal(true);
         setTitle('');
         setDescription('');
         setCategory('');
@@ -128,12 +126,12 @@ export default function LaporanMasalahScreen() {
     <AnimatedBackground style={styles.container}>
       <SafeAreaView style={styles.container}>
         {/* Header */}
-        <View style={[styles.header, { backgroundColor: tokens.cardBg, borderBottomColor: tokens.borderColor }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+        <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { backgroundColor: tokens.iconButtonBg, borderColor: tokens.borderColor }]}>
           <ArrowLeft color={tokens.textColor} size={24} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: tokens.textColor }]}>Laporan Masalah</Text>
-        <View style={{ width: 40 }} />
+        <View style={{ width: 44 }} />
       </View>
 
       <ScrollView 
@@ -141,42 +139,50 @@ export default function LaporanMasalahScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
         {/* Form Section */}
-        <View style={[styles.formCard, { backgroundColor: tokens.cardBg, borderColor: tokens.borderColor }]}>
+        <View style={styles.formCard}>
           <Text style={[styles.sectionTitle, { color: tokens.textColor }]}>Buat Laporan Baru</Text>
           
-          <TextInput
-            style={[styles.input, { backgroundColor: isLightTheme ? '#F1F5F9' : '#1E293B', color: tokens.textColor }]}
-            placeholder="Judul Laporan (Contoh: AC Rusak)"
-            placeholderTextColor={isLightTheme ? '#94A3B8' : '#64748B'}
-            value={title}
-            onChangeText={setTitle}
-          />
+          <View style={[styles.inputWrapper, { backgroundColor: tokens.inputBg, borderColor: tokens.borderColor }]}>
+            <TextInput
+              style={[styles.input, { color: tokens.textColor }]}
+              placeholder="Judul Laporan (Contoh: AC Rusak)"
+              placeholderTextColor={isLightTheme ? '#94A3B8' : '#64748B'}
+              value={title}
+              onChangeText={setTitle}
+            />
+          </View>
 
-          <TextInput
-            style={[styles.input, { backgroundColor: isLightTheme ? '#F1F5F9' : '#1E293B', color: tokens.textColor }]}
-            placeholder="Kategori (Fasilitas, IoT, dll)"
-            placeholderTextColor={isLightTheme ? '#94A3B8' : '#64748B'}
-            value={category}
-            onChangeText={setCategory}
-          />
+          <View style={[styles.inputWrapper, { backgroundColor: tokens.inputBg, borderColor: tokens.borderColor }]}>
+            <TextInput
+              style={[styles.input, { color: tokens.textColor }]}
+              placeholder="Kategori (Fasilitas, IoT, dll)"
+              placeholderTextColor={isLightTheme ? '#94A3B8' : '#64748B'}
+              value={category}
+              onChangeText={setCategory}
+            />
+          </View>
 
-          <TextInput
-            style={[styles.input, { backgroundColor: isLightTheme ? '#F1F5F9' : '#1E293B', color: tokens.textColor }]}
-            placeholder="Lokasi (Contoh: Ruang 301)"
-            placeholderTextColor={isLightTheme ? '#94A3B8' : '#64748B'}
-            value={location}
-            onChangeText={setLocation}
-          />
+          <View style={[styles.inputWrapper, { backgroundColor: tokens.inputBg, borderColor: tokens.borderColor }]}>
+            <TextInput
+              style={[styles.input, { color: tokens.textColor }]}
+              placeholder="Lokasi (Contoh: Ruang 301)"
+              placeholderTextColor={isLightTheme ? '#94A3B8' : '#64748B'}
+              value={location}
+              onChangeText={setLocation}
+            />
+          </View>
 
-          <TextInput
-            style={[styles.textArea, { backgroundColor: isLightTheme ? '#F1F5F9' : '#1E293B', color: tokens.textColor }]}
-            placeholder="Deskripsikan masalah dengan detail..."
-            placeholderTextColor={isLightTheme ? '#94A3B8' : '#64748B'}
-            multiline
-            numberOfLines={4}
-            value={description}
-            onChangeText={setDescription}
-          />
+          <View style={[styles.inputWrapper, { backgroundColor: tokens.inputBg, borderColor: tokens.borderColor }]}>
+            <TextInput
+              style={[styles.textArea, { color: tokens.textColor }]}
+              placeholder="Deskripsikan masalah dengan detail..."
+              placeholderTextColor={isLightTheme ? '#94A3B8' : '#64748B'}
+              multiline
+              numberOfLines={4}
+              value={description}
+              onChangeText={setDescription}
+            />
+          </View>
 
           <TouchableOpacity style={[styles.submitButton, { backgroundColor: Colors.ai.primary, opacity: isSubmitting ? 0.7 : 1 }]} onPress={handleSubmit} disabled={isSubmitting}>
             <Send color="#FFF" size={20} />
@@ -216,6 +222,33 @@ export default function LaporanMasalahScreen() {
           })
         )}
       </ScrollView>
+
+      {/* Premium Success Modal */}
+      <AppModal 
+        visible={showSuccessModal} 
+        onClose={() => setShowSuccessModal(false)}
+        title="Terkirim!"
+      >
+        <View style={{ alignItems: 'center' }}>
+          <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(16, 185, 129, 0.1)', justifyContent: 'center', alignItems: 'center', marginBottom: 16 }}>
+            <CheckCircle size={40} color="#10B981" />
+          </View>
+          <Text style={{ fontSize: 22, fontWeight: 'bold', color: tokens.textColor, marginBottom: 8, textAlign: 'center' }}>
+            Laporan Berhasil Dikirim
+          </Text>
+          <Text style={{ color: tokens.subTextColor, textAlign: 'center', marginBottom: 24 }}>
+            Terima kasih! Laporan Anda telah masuk ke sistem dan akan segera ditindaklanjuti oleh admin/teknisi terkait.
+          </Text>
+          
+          <TouchableOpacity 
+            style={{ width: '100%', backgroundColor: Colors.ai.primary, padding: 16, borderRadius: 16, alignItems: 'center' }}
+            onPress={() => setShowSuccessModal(false)}
+          >
+            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Tutup</Text>
+          </TouchableOpacity>
+        </View>
+      </AppModal>
+
       </SafeAreaView>
     </AnimatedBackground>
   );
@@ -227,33 +260,39 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingVertical: 16,
-    borderBottomWidth: 1,
   },
-  backButton: { width: 40, height: 40, justifyContent: 'center' },
-  headerTitle: { fontSize: 18, fontWeight: '700' },
-  scrollContent: { padding: 20, paddingBottom: 100 },
+  backButton: { 
+    width: 44, 
+    height: 44, 
+    justifyContent: 'center', 
+    alignItems: 'center',
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  headerTitle: { fontSize: 20, fontWeight: '800' },
+  scrollContent: { paddingHorizontal: 24, paddingBottom: 100 },
   formCard: {
-    padding: 20,
+    marginBottom: 32,
+    marginTop: 10,
+  },
+  sectionTitle: { fontSize: 18, fontWeight: '800', marginBottom: 16 },
+  inputWrapper: {
     borderRadius: 16,
     borderWidth: 1,
-    marginBottom: 24,
+    marginBottom: 16,
+    paddingHorizontal: 4,
   },
-  sectionTitle: { fontSize: 16, fontWeight: '700', marginBottom: 16 },
   input: {
-    borderRadius: 12,
     paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 14,
-    marginBottom: 12,
+    paddingVertical: 16,
+    fontSize: 15,
   },
   textArea: {
-    borderRadius: 12,
     paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 14,
-    marginBottom: 16,
+    paddingVertical: 16,
+    fontSize: 15,
     minHeight: 100,
     textAlignVertical: 'top',
   },
@@ -262,10 +301,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 16,
-    borderRadius: 12,
+    borderRadius: 16,
     gap: 8,
+    marginTop: 8,
   },
-  submitButtonText: { color: '#FFF', fontSize: 16, fontWeight: '600' },
+  submitButtonText: { color: '#FFF', fontSize: 16, fontWeight: '700' },
   historyTitle: { fontSize: 18, fontWeight: '700', marginBottom: 16 },
   emptyText: { textAlign: 'center', marginTop: 20 },
   historyCard: {

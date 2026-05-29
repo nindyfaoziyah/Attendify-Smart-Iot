@@ -5,7 +5,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '@/constants/Colors';
 import { Camera, Calendar, Clock, MapPin, Bell, CheckCircle2, AlertTriangle } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
-import { BlurView } from 'expo-blur';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { AttendanceChart } from '../components/AttendanceChart';
@@ -19,21 +18,25 @@ import RealtimeIndicator from '../components/ui/RealtimeIndicator';
 import * as Location from 'expo-location';
 import { API_URL } from '@/constants/Config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
 
 export default function HomeScreen() {
   const navigation = useNavigation<any>();
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   console.log('HomeScreen User Data:', JSON.stringify(user));
-  const { tokens, isLightTheme } = useTheme();
+  const { tokens, isLightTheme, themeColors } = useTheme();
+  const themePrimary = themeColors && themeColors.length > 0 ? themeColors[Math.min(1, themeColors.length - 1)] : Colors.ai.primary;
   const [showReportModal, setShowReportModal] = useState(false);
   const [lastAttendancePhoto, setLastAttendancePhoto] = useState<string | null>(null);
+  const [hasScannedToday, setHasScannedToday] = useState(false);
   const [userLocation, setUserLocation] = useState<string | null>(null);
   const [attendanceSuccess, setAttendanceSuccess] = useState<any>(null);
 
   const userName = user?.fullName || 'Mahasiswa';
+  const firstName = userName.split(' ')[0];
   const userProdi = user?.prodi || '-';
 
   const { socket } = useSocket();
@@ -45,6 +48,7 @@ export default function HomeScreen() {
       if (user && user.id && data.user_id === user.id) {
         setAttendanceSuccess(data);
         setLastAttendancePhoto(data.photo);
+        setHasScannedToday(true);
 
         // Fetch GPS Location
         try {
@@ -105,31 +109,21 @@ export default function HomeScreen() {
   const [statsLastUpdated, setStatsLastUpdated] = useState<Date>(new Date());
 
   const fetchStats = async () => {
+    if (!user || !user.id) return;
     try {
       const token = await AsyncStorage.getItem('@attendify_auth_token');
-      const response = await fetch(`${API_URL}/jadwal`, {
+      const response = await fetch(`${API_URL}/dashboard/stats/${user.id}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
       const data = await response.json();
-      if (data.status === 'success' && Array.isArray(data.data)) {
-        let filtered = data.data;
-        if (user && user.kelas) {
-          filtered = data.data.filter((item: any) => 
-            String(item.class_name).toLowerCase() === String(user.kelas).toLowerCase()
-          );
+      if (data.status === 'success' && data.data) {
+        setHasScannedToday(data.data.alreadyScannedToday);
+        if (data.data.stats && Array.isArray(data.data.stats)) {
+          setAttendanceData(data.data.stats);
         }
-        if (filtered.length > 0) {
-          const formatted = filtered.map((item: any) => ({
-            subject: item.subject,
-            attendance: Math.round((item.attended_count / (item.total_students || 1)) * 100),
-            total: item.total_students || 1,
-            attended: item.attended_count || 0,
-          }));
-          setAttendanceData(formatted);
-          setStatsLastUpdated(new Date());
-        }
+        setStatsLastUpdated(new Date());
       }
     } catch (error) {
       console.log('Error fetching stats:', error);
@@ -166,17 +160,20 @@ export default function HomeScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         
         {/* Header */}
-        <View style={styles.headerContainer}>
+        <View style={[styles.headerContainer, { paddingTop: Platform.OS === 'web' ? 40 : Math.max(insets.top, 50) + 10 }]}>
           <View style={styles.topRow}>
             <View style={styles.greetingBox}>
-              <Text style={[styles.greeting, { color: tokens.textColor }]}>
-                Halo, {userName} 👋
+              <Text style={[styles.subGreeting, { color: tokens.subTextColor }]}>
+                Selamat datang kembali,
+              </Text>
+              <Text style={[styles.greeting, { color: tokens.textColor }]} numberOfLines={1}>
+                Halo, {firstName} 👋
               </Text>
             </View>
 
             <View style={styles.headerRight}>
               <TouchableOpacity 
-                style={[styles.notifBtn, { marginRight: 10, backgroundColor: tokens.iconButtonBg }]} 
+                style={[styles.notifBtn, { backgroundColor: tokens.iconButtonBg }]} 
                 onPress={() => navigation.navigate('LaporanMasalah')}
               >
                 <AlertTriangle color="#FBBF24" size={22} />
@@ -190,12 +187,14 @@ export default function HomeScreen() {
         </View>
 
         {/* Status */}
-        <BlurView intensity={20} tint={isLightTheme ? 'light' : 'dark'} style={[styles.statusCard, { borderWidth: 1, borderColor: tokens.borderColor }]}>
+        <View style={[styles.statusCard, { borderWidth: 1, borderColor: tokens.borderColor, backgroundColor: tokens.cardBg }]}>
           <View style={styles.statusInfo}>
             <Text style={[styles.statusLabel, { color: tokens.textColor }]}>Status Hari Ini</Text>
             <View style={styles.statusBadge}>
-              <View style={styles.pulseDot} />
-              <Text style={styles.statusBadgeText}>{lastAttendancePhoto ? 'Sudah Absen' : 'Belum Absen'}</Text>
+              <View style={[styles.pulseDot, hasScannedToday && { backgroundColor: '#10B981' }]} />
+              <Text style={[styles.statusBadgeText, hasScannedToday && { color: '#10B981' }]}>
+                {hasScannedToday ? 'Sudah Absen' : 'Belum Absen'}
+              </Text>
             </View>
           </View>
 
@@ -208,7 +207,7 @@ export default function HomeScreen() {
             </View>
             <Text style={[styles.detailValue, { color: tokens.textColor }]}>{userLocation ? '' : '0%'}</Text>
           </View>
-        </BlurView>
+        </View>
 
         {/* Real-time Attendance Photo */}
         {lastAttendancePhoto && (
@@ -224,21 +223,21 @@ export default function HomeScreen() {
         {/* Main Menu */}
         <View style={styles.menuContainer}>
           <TouchableOpacity 
-            style={[styles.menuItem, { backgroundColor: isLightTheme ? 'rgba(30, 79, 168, 0.05)' : 'rgba(255,255,255,0.05)', borderColor: tokens.borderColor }]} 
+            style={[styles.menuItem, { backgroundColor: tokens.cardBg, borderColor: tokens.borderColor }]} 
             onPress={handleScan}
           >
             <View style={[styles.iconBox, { backgroundColor: 'rgba(96, 165, 250, 0.15)' }]}>
-              <Camera color="#60A5FA" size={26} />
+              <Camera color={isLightTheme ? themePrimary : "#60A5FA"} size={26} />
             </View>
-            <Text style={[styles.menuLabel, { color: tokens.textColor }]}>Scan QR</Text>
+            <Text style={[styles.menuLabel, { color: tokens.textColor }]}>Scan Wajah</Text>
           </TouchableOpacity>
 
           <TouchableOpacity 
-            style={[styles.menuItem, { backgroundColor: isLightTheme ? 'rgba(30, 79, 168, 0.05)' : 'rgba(255,255,255,0.05)', borderColor: tokens.borderColor }]} 
+            style={[styles.menuItem, { backgroundColor: tokens.cardBg, borderColor: tokens.borderColor }]} 
             onPress={handleJadwal}
           >
             <View style={[styles.iconBox, { backgroundColor: 'rgba(167, 139, 250, 0.15)' }]}>
-              <Calendar color="#A78BFA" size={26} />
+              <Calendar color={isLightTheme ? themePrimary : "#A78BFA"} size={26} />
             </View>
             <Text style={[styles.menuLabel, { color: tokens.textColor }]}>Jadwal</Text>
           </TouchableOpacity>
@@ -255,13 +254,9 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        <BlurView 
-          intensity={20} 
-          tint={isLightTheme ? 'light' : 'dark'} 
-          style={[styles.chartWrapper, { borderColor: tokens.borderColor, backgroundColor: tokens.cardBg }]}
-        >
+        <View style={[styles.chartWrapper, { borderColor: tokens.borderColor, backgroundColor: tokens.cardBg }]}>
           <AttendanceChart data={attendanceData} />
-        </BlurView>
+        </View>
       </ScrollView>
 
       <ReportIssueModal 
@@ -322,12 +317,11 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   scrollContent: {
-    paddingBottom: 40,
+    paddingBottom: 120,
   },
   headerContainer: {
-    paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'web' ? 20 : 60,
-    paddingBottom: 20,
+    paddingHorizontal: 24,
+    paddingBottom: 24,
   },
   topRow: {
     flexDirection: 'row',
@@ -336,23 +330,26 @@ const styles = StyleSheet.create({
   },
   greetingBox: {
     flex: 1,
+    paddingRight: 16,
   },
   subGreeting: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '500',
+    marginBottom: 4,
   },
   greeting: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginTop: 4,
+    fontSize: 26,
+    fontWeight: '800',
+    lineHeight: 32,
   },
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
   },
   notifBtn: {
-    width: 44,
-    height: 44,
+    width: 48,
+    height: 48,
     borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',

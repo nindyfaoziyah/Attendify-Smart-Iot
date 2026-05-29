@@ -4,7 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '@/constants/Colors';
 import { UserCog, ChevronLeft, ChevronRight, Shield, Info, HelpCircle, Palette, MessageSquare, Send, X, Check } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
-import { BlurView } from 'expo-blur';
+// import { BlurView } from 'expo-blur';
 import { useAuth } from '../context/AuthContext';
 import { useTheme, DEFAULT_GRADIENT } from '../context/ThemeContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -96,16 +96,15 @@ export default function SettingsScreen() {
   return (
     <AnimatedBackground style={styles.container}>
       <Animated.View entering={FadeInDown.duration(600).springify()} style={styles.header}>
-        <TouchableOpacity
-          onPress={handleBack}
-          style={[styles.backButton, { backgroundColor: tokens.iconButtonBg, borderColor: tokens.borderColor }]}
-        >
-          <ChevronLeft size={28} color={tokens.textColor} />
+        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+          <ChevronLeft size={32} color={tokens.textColor} />
         </TouchableOpacity>
-        <Text style={[styles.title, { color: tokens.textColor }]}>Pengaturan</Text>
-        <TouchableOpacity onPress={() => handleDevFeature('Pusat Bantuan')}>
-          <HelpCircle size={24} color={tokens.subTextColor} />
-        </TouchableOpacity>
+        <Text style={[styles.title, { color: tokens.textColor, flex: 1, textAlign: 'center' }]}>Pengaturan</Text>
+        <View style={{ width: 40, alignItems: 'flex-end' }}>
+          <TouchableOpacity onPress={() => handleDevFeature('Pusat Bantuan')}>
+            <HelpCircle size={24} color={tokens.subTextColor} />
+          </TouchableOpacity>
+        </View>
       </Animated.View>
 
       <ScrollView
@@ -115,7 +114,7 @@ export default function SettingsScreen() {
 
         <View style={styles.settingsGroup}>
           <Text style={[styles.groupTitle, { color: tokens.labelColor }]}>Keamanan & Akun</Text>
-          <BlurView intensity={20} tint={isLightTheme ? 'light' : 'dark'} style={[styles.card, { borderColor: tokens.borderColor }]}>
+          <View style={[styles.card, { backgroundColor: tokens.cardBg, borderColor: tokens.borderColor }]}>
             <TouchableOpacity
               style={styles.settingItem}
               onPress={() => navigation.navigate('ProfileDetails')}
@@ -141,12 +140,12 @@ export default function SettingsScreen() {
               </View>
               <ChevronRight size={20} color={tokens.subTextColor} />
             </TouchableOpacity>
-          </BlurView>
+          </View>
         </View>
 
         <View style={styles.settingsGroup}>
           <Text style={[styles.groupTitle, { color: tokens.labelColor }]}>Tampilan</Text>
-          <BlurView intensity={20} tint={isLightTheme ? 'light' : 'dark'} style={[styles.card, { borderColor: tokens.borderColor }]}>
+          <View style={[styles.card, { backgroundColor: tokens.cardBg, borderColor: tokens.borderColor }]}>
             <View style={[styles.settingItem, styles.noBorder, { flexDirection: 'column', alignItems: 'flex-start' }]}>
               <View style={styles.settingItemLeft}>
                 <View style={[styles.iconBox, { backgroundColor: 'rgba(236, 72, 153, 0.15)' }]}>
@@ -194,13 +193,13 @@ export default function SettingsScreen() {
                 })}
               </ScrollView>
             </View>
-          </BlurView>
+          </View>
         </View>
 
         {role !== 'admin' && (
           <View style={styles.settingsGroup}>
             <Text style={[styles.groupTitle, { color: tokens.labelColor }]}>Bantuan</Text>
-            <BlurView intensity={20} tint={isLightTheme ? 'light' : 'dark'} style={[styles.card, { borderColor: tokens.borderColor }]}>
+            <View style={[styles.card, { backgroundColor: tokens.cardBg, borderColor: tokens.borderColor }]}>
               <TouchableOpacity
                 style={[styles.settingItem, styles.noBorder]}
                 onPress={() => setIsReportModalVisible(true)}
@@ -213,13 +212,13 @@ export default function SettingsScreen() {
                 </View>
                 <ChevronRight size={20} color={tokens.subTextColor} />
               </TouchableOpacity>
-            </BlurView>
+            </View>
           </View>
         )}
 
         <View style={styles.settingsGroup}>
           <Text style={[styles.groupTitle, { color: tokens.labelColor }]}>Lainnya</Text>
-          <BlurView intensity={20} tint={isLightTheme ? 'light' : 'dark'} style={[styles.card, { borderColor: tokens.borderColor }]}>
+          <View style={[styles.card, { backgroundColor: tokens.cardBg, borderColor: tokens.borderColor }]}>
             <TouchableOpacity
               style={[styles.settingItem, styles.noBorder]}
               onPress={() => navigation.navigate('AboutAttendify')}
@@ -232,7 +231,7 @@ export default function SettingsScreen() {
               </View>
               <Text style={[styles.versionText, { color: tokens.labelColor }]}>v1.0.4</Text>
             </TouchableOpacity>
-          </BlurView>
+          </View>
         </View>
 
         <View style={{ marginTop: 24 }}>
@@ -244,7 +243,7 @@ export default function SettingsScreen() {
       <Modal visible={isReportModalVisible} transparent animationType="slide">
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <View style={styles.modalOverlay}>
-            <BlurView intensity={40} tint={isLightTheme ? 'light' : 'dark'} style={[styles.modalContent, { backgroundColor: tokens.cardBg, borderColor: tokens.borderColor }]}>
+            <View style={[styles.modalContent, { backgroundColor: isLightTheme ? '#FFFFFF' : '#1E293B', borderColor: tokens.borderColor }]}>
               <View style={styles.modalHeader}>
                 <Text style={[styles.modalTitle, { color: tokens.textColor }]}>Laporkan Masalah</Text>
                 <TouchableOpacity onPress={() => setIsReportModalVisible(false)}>
@@ -275,7 +274,7 @@ export default function SettingsScreen() {
                   </>
                 )}
               </TouchableOpacity>
-            </BlurView>
+            </View>
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -289,21 +288,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 60,
-    paddingHorizontal: 24,
-    paddingBottom: 24
+    paddingTop: Platform.OS === 'web' ? 20 : Platform.OS === 'ios' ? 70 : 70,
+    paddingHorizontal: 20,
+    paddingBottom: 20
   },
   backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    width: 40,
+    height: 40,
     justifyContent: 'center',
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
   title: { fontSize: 22, fontWeight: 'bold', color: '#fff', letterSpacing: 0.5 },
-  scrollContent: { paddingHorizontal: 20, paddingBottom: 60 },
-  settingsGroup: { marginBottom: 32 },
+  scrollContent: { paddingHorizontal: 20, paddingBottom: 20 },
+  settingsGroup: { marginBottom: 20 },
   groupTitle: {
     fontSize: 12,
     fontWeight: 'bold',
@@ -344,7 +341,7 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.2)',
     fontSize: 12,
     marginTop: 10,
-    marginBottom: 40
+    marginBottom: 20
   },
   logoutBtn: {
     marginTop: 32,

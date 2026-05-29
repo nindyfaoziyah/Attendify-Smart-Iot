@@ -13,6 +13,7 @@ const getAttendanceData = async (classId, date, jadwalId) => {
             p.username as nim, 
             mk.nama_mk as subject, 
             k.nama_kelas as class_name,
+            k.prodi as prodi,
             d.nama as dosen_name,
             jk.ruang,
             IFNULL(a.tanggal, CURDATE()) as tanggal, 
@@ -197,7 +198,7 @@ exports.exportExcel = async (req, res) => {
                 nim: item.nim,
                 name: item.name,
                 time: item.time || '--:--',
-                status: item.status.toUpperCase()
+                status: (item.status && item.status.trim() !== '') ? item.status.toUpperCase() : 'BELUM HADIR'
             });
         });
 
@@ -389,7 +390,7 @@ exports.getDosenDailyReports = async (req, res) => {
 exports.getDailyReports = async (req, res) => {
     try {
         const [reports] = await db.query(`
-            SELECT d.*, p.nama as dosen_name, k.nama_kelas 
+            SELECT d.*, p.nama as dosen_name, k.nama_kelas, k.prodi 
             FROM daily_attendance_reports d
             LEFT JOIN pengguna p ON d.dosen_id = p.id_user
             LEFT JOIN kelas k ON d.class_id = k.id_kelas
@@ -453,6 +454,65 @@ exports.createSystemReport = async (req, res) => {
         );
         res.json({ status: 'success', message: 'Laporan berhasil dikirim' });
     } catch (err) {
+        res.status(500).json({ status: 'error', message: err.message });
+    }
+};
+
+// ======================================================
+// SCHEDULE STATS UNTUK MODAL FRONTEND
+// ======================================================
+exports.getScheduleReportStats = async (req, res) => {
+    try {
+        const { class_id, jadwal_id, date } = req.query;
+
+        if (!jadwal_id) {
+            return res.status(400).json({ status: 'error', message: 'jadwal_id is required' });
+        }
+
+        const data = await getAttendanceData(class_id, date, jadwal_id);
+
+        let stats = {
+            hadir: 0,
+            terlambat: 0,
+            izin: 0,
+            alfa: 0,
+            belum_hadir: 0
+        };
+
+        const students = data.map(item => {
+            let originalStatus = (item.status && item.status.trim() !== '') ? item.status.trim() : 'belum hadir';
+            if (originalStatus === '') {
+                originalStatus = 'BELUM HADIR';
+            }
+            const status = originalStatus.toLowerCase();
+            if (status === 'hadir') stats.hadir++;
+            else if (status === 'terlambat') stats.terlambat++;
+            else if (status === 'izin') stats.izin++;
+            else if (status === 'alfa') stats.alfa++;
+            else stats.belum_hadir++;
+
+            return {
+                id: item.id_absensi,
+                nim: item.nim,
+                name: item.name,
+                time: item.time,
+                status: originalStatus.toUpperCase(),
+                subject: item.subject,
+                class_name: item.class_name,
+                prodi: item.prodi,
+                dosen_name: item.dosen_name
+            };
+        });
+
+        res.json({
+            status: 'success',
+            data: {
+                stats,
+                students
+            }
+        });
+    } catch (err) {
+        console.error('getScheduleReportStats Error:', err);
         res.status(500).json({ status: 'error', message: err.message });
     }
 };

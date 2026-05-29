@@ -4,13 +4,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '@/constants/Colors';
 import { MapPin, Clock, Calendar, BookOpen, ChevronDown, ChevronUp, ArrowLeft } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
-import { BlurView } from 'expo-blur';
+
 import { useTheme } from '../context/ThemeContext';
 import { AttendanceChart } from '../components/AttendanceChart';
 import AnimatedBackground from '../components/ui/AnimatedBackground';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_URL } from '@/constants/Config';
 import { useAuth } from '../context/AuthContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
 
@@ -35,6 +36,7 @@ export default function JadwalScreen() {
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     fetchSchedules();
@@ -132,7 +134,7 @@ export default function JadwalScreen() {
   return (
     <AnimatedBackground style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: Platform.OS === 'web' ? 40 : Math.max(insets.top, 50) + 10 }]}>
         <View style={styles.headerTop}>
           <TouchableOpacity 
             onPress={() => navigation.goBack()} 
@@ -162,10 +164,12 @@ export default function JadwalScreen() {
         </View>
       ) : schedules.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Calendar color={tokens.subTextColor} size={64} style={{ opacity: 0.5, marginBottom: 16 }} />
-          <Text style={[styles.emptyText, { color: tokens.textColor }]}>Tidak ada jadwal kuliah</Text>
+          <View style={[styles.emptyIconBox, { backgroundColor: isLightTheme ? 'rgba(59, 130, 246, 0.1)' : 'rgba(96, 165, 250, 0.1)' }]}>
+            <Calendar color={Colors.ai.primary} size={48} />
+          </View>
+          <Text style={[styles.emptyText, { color: tokens.textColor }]}>Hari Ini Kosong!</Text>
           <Text style={[styles.emptySubText, { color: tokens.subTextColor }]}>
-            Kelas {user?.kelas || '-'} belum memiliki jadwal terdaftar hari ini.
+            Kelas {user?.kelas || '-'} tidak memiliki jadwal kuliah untuk hari ini. Waktunya beristirahat atau mengerjakan tugas!
           </Text>
         </View>
       ) : (
@@ -179,10 +183,8 @@ export default function JadwalScreen() {
 
             return (
               <View key={item.id}>
-                <BlurView
-                  intensity={20}
-                  tint={isLightTheme ? 'light' : 'dark'}
-                  style={[styles.card, { borderColor: tokens.borderColor }]}
+                <View
+                  style={[styles.card, { borderColor: tokens.borderColor, backgroundColor: tokens.cardBg }]}
                 >
                   {/* Left indicator bar */}
                   <View style={[styles.cardIndicator, { backgroundColor: statusStyle.text }]} />
@@ -234,13 +236,11 @@ export default function JadwalScreen() {
                       </TouchableOpacity>
                     </View>
                   </View>
-                </BlurView>
+                </View>
 
                 {isExpanded && (
-                  <BlurView
-                    intensity={20}
-                    tint={isLightTheme ? 'light' : 'dark'}
-                    style={[styles.expandedCard, { borderColor: tokens.borderColor }]}
+                  <View
+                    style={[styles.expandedCard, { borderColor: tokens.borderColor, backgroundColor: tokens.cardBg }]}
                   >
                     <AttendanceChart
                       data={[{
@@ -252,7 +252,7 @@ export default function JadwalScreen() {
                       title={`Grafik Absensi ${item.subject}`}
                       showLegend={false}
                     />
-                  </BlurView>
+                  </View>
                 )}
               </View>
             );
@@ -266,8 +266,7 @@ export default function JadwalScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
-    paddingTop: Platform.OS === 'web' ? 20 : 60,
-    paddingHorizontal: 24,
+    paddingHorizontal: 16,
     paddingBottom: 20,
   },
   headerTop: {
@@ -297,7 +296,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 20,
@@ -437,15 +436,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 40,
+    marginTop: -50,
+  },
+  emptyIconBox: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
   },
   emptyText: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 8,
+    fontSize: 22,
+    fontWeight: '800',
+    marginBottom: 12,
   },
   emptySubText: {
-    fontSize: 14,
+    fontSize: 15,
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 24,
   },
 });

@@ -3,6 +3,7 @@ import { TouchableOpacity, Text, StyleSheet, ViewStyle, TextStyle, View } from '
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import { DesignSystem } from '@/constants/DesignSystem';
+import { useTheme } from '../../context/ThemeContext';
 
 interface AnimatedButtonProps {
   title: string;
@@ -27,6 +28,7 @@ const AnimatedButton: React.FC<AnimatedButtonProps> = ({
   icon,
   gradient,
 }) => {
+  const { themeColors } = useTheme();
   const scale = useSharedValue(1);
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -50,7 +52,10 @@ const AnimatedButton: React.FC<AnimatedButtonProps> = ({
       case 'secondary':
         return ['#6B7280', '#4B5563'];
       default:
-        return gradient || DesignSystem.gradients.primary;
+        return gradient || (themeColors && themeColors.length > 0 ? [
+          themeColors[Math.min(1, themeColors.length - 1)],
+          themeColors[Math.min(2, themeColors.length - 1)]
+        ] : DesignSystem.gradients.primary);
     }
   };
 

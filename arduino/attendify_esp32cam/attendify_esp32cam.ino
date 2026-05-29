@@ -20,9 +20,10 @@ const char* serverUrl = "http://10.32.235.251:5000/api/iot/recognize";
 String deviceId = "ESP32CAM_01";
 
 // =====================================================
-// PIR SENSOR
+// PIR SENSOR & FLASH
 // =====================================================
 #define PIR_PIN 13
+#define FLASH_PIN 4
 
 // =====================================================
 // CAMERA MODEL AI THINKER
@@ -84,7 +85,7 @@ void startCamera() {
   config.pixel_format = PIXFORMAT_JPEG;
 
   if (psramFound()) {
-    config.frame_size = FRAMESIZE_VGA; // DIUBAH KE VGA (640x480) AGAR LEBIH JELAS
+    config.frame_size = FRAMESIZE_VGA; // DIKEMBALIKAN KE VGA (640x480) AGAR 2 WAJAH TETAP KELIHATAN
     config.jpeg_quality = 10;
     config.fb_count = 1;
   } else {
@@ -116,7 +117,7 @@ void sendPhoto() {
   esp_camera_fb_return(fb);
 
   HTTPClient http;
-  http.setTimeout(20000); // SET TIMEOUT 20 DETIK AGAR TIDAK -11
+  http.setTimeout(40000); // SET TIMEOUT 40 DETIK AGAR TIDAK -11 KARENA PROSES MULTI-FACE LEBIH BERAT
   http.begin(serverUrl);
   http.addHeader("Content-Type", "application/json");
 
@@ -146,6 +147,10 @@ void sendPhoto() {
 void setup() {
   Serial.begin(115200);
   pinMode(PIR_PIN, INPUT);
+  
+  // SETUP FLASH LED
+  pinMode(FLASH_PIN, OUTPUT);
+  digitalWrite(FLASH_PIN, LOW);
 
   WiFi.begin(ssid, password);
   Serial.print("Connecting WiFi");
@@ -171,7 +176,17 @@ void loop() {
 
   if (motion == HIGH) {
     Serial.println("🔥 Motion Detected");
+    
+    // NYALAKAN FLASH DULUAN
+    digitalWrite(FLASH_PIN, HIGH);
+    
+    // JEDA SANGAT SINGKAT (100ms) HANYA UNTUK MENUNGGU LAMPU FLASH TERANG MAKSIMAL
+    delay(100);
+
     sendPhoto();
+    
+    // MATIKAN FLASH
+    digitalWrite(FLASH_PIN, LOW);
     
     // TUNGGU SAMPAI SENSOR PIR KEMBALI NORMAL (LOW)
     // Dibatasi maksimal 10 detik agar tidak nyangkut (timeout)
@@ -182,7 +197,10 @@ void loop() {
       waitCount++;
     }
     Serial.println("Sensor kembali standby.");
-    delay(2000); // Jeda ekstra sebelum mulai mendeteksi lagi
+    // BERIKAN JEDA TAMBAHAN (COOLDOWN) 8 DETIK AGAR TIDAK LANGSUNG NGULANG TERUS
+    Serial.println("Jeda (cooldown) aktif selama 8 detik...");
+    delay(8000); 
+    Serial.println("Siap mendeteksi lagi.");
     
   } else {
     // Kurangi log spam saat standby

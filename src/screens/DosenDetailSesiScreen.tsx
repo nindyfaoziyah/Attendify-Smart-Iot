@@ -245,9 +245,32 @@ Terima kasih atas perhatian Anda.`;
     }
   };
 
-  const confirmFinishSession = () => {
+  const confirmFinishSession = async () => {
     setIsConfirmVisible(false);
-    navigation.goBack();
+    showToast("⌛ Menyimpan data presensi...");
+    try {
+      const token = await AsyncStorage.getItem('@attendify_auth_token');
+      const response = await fetch(`${API_URL}/absensi/finish`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ jadwal_id: scheduleItem.id }),
+      });
+      
+      const data = await response.json();
+      if (data.status === 'success') {
+        showToast("✅ Rekap berhasil disimpan!");
+        setTimeout(() => {
+          navigation.goBack();
+        }, 1500);
+      } else {
+        showToast(`❌ Gagal: ${data.message || 'Gagal merekap presensi'}`);
+      }
+    } catch (error) {
+      showToast(`❌ Error: Gagal terhubung ke server`);
+    }
   };
 
   const totalHadir = students.filter(s => s.status === 'HADIR').length;

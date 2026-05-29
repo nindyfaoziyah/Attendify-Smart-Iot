@@ -3,7 +3,6 @@ import {
   TextInput, View, StyleSheet, ViewStyle,
   TextInputProps, Animated, Platform, Text, TouchableOpacity
 } from 'react-native';
-import { BlurView } from 'expo-blur';
 import { DesignSystem } from '../../../constants/DesignSystem';
 import { LucideIcon } from 'lucide-react-native';
 import { useTheme } from '../../context/ThemeContext';
@@ -29,7 +28,8 @@ export const AnimatedInput: React.FC<AnimatedInputProps> = ({
   placeholder,
   ...props
 }) => {
-  const { tokens, isLightTheme } = useTheme();
+  const { tokens, isLightTheme, themeColors } = useTheme();
+  const themePrimary = themeColors && themeColors.length > 0 ? themeColors[Math.min(1, themeColors.length - 1)] : DesignSystem.colors.primary;
   const glowAnim = useRef(new Animated.Value(0)).current;
   const [isFocused, setIsFocused] = React.useState(false);
   const [hasValue, setHasValue] = React.useState(false);
@@ -74,30 +74,22 @@ export const AnimatedInput: React.FC<AnimatedInputProps> = ({
     props.onBlur?.({} as any);
   };
 
-  const glowInterpolation = glowAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [
-      'rgba(30, 79, 168, 0)',
-      'rgba(30, 79, 168, 0.3)',
-    ],
-  });
-
   const borderColorAnimation = glowAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [
       tokens.borderColor,
-      isLightTheme ? '#1E4FA8' : DesignSystem.colors.primary,
+      isLightTheme ? themePrimary : 'rgba(255,255,255,0.5)',
     ],
   });
 
-  const effectiveIconColor = iconColor || (isLightTheme ? '#1E4FA8' : DesignSystem.colors.primary);
+  const effectiveIconColor = iconColor || tokens.subTextColor;
 
   return (
     <View style={[styles.container, containerStyle]}>
       {label && floatingLabel && (
         <Text style={[
           styles.label,
-          isFocused || hasValue ? styles.labelFloat : styles.labelDefault,
+          isFocused || hasValue ? [styles.labelFloat, { color: themePrimary }] : styles.labelDefault,
         ]}>
           {label}
         </Text>
@@ -107,24 +99,23 @@ export const AnimatedInput: React.FC<AnimatedInputProps> = ({
         style={[
           styles.inputWrapper,
           {
-            shadowColor: glowInterpolation as any,
-            shadowOpacity: 1,
+            backgroundColor: tokens.inputBg,
           },
         ]}
       >
-        <BlurView intensity={DesignSystem.blur} style={styles.blur}>
+        <View style={styles.blur}>
           <View
             style={[
               styles.inputContainer,
-              { backgroundColor: tokens.inputBg, borderColor: tokens.borderColor },
+              { borderColor: tokens.borderColor },
               error ? styles.errorBorder : styles.defaultBorder,
-              isFocused && styles.focusedBorder,
+              isFocused && { borderColor: isLightTheme ? themePrimary : 'rgba(255,255,255,0.5)' },
             ]}
           >
             {Icon && (
               <Icon
                 size={20}
-                color={isFocused ? (isLightTheme ? '#1E4FA8' : DesignSystem.colors.primary) : effectiveIconColor}
+                color={isFocused ? (isLightTheme ? themePrimary : '#FFF') : effectiveIconColor}
                 style={styles.icon}
               />
             )}
@@ -135,8 +126,6 @@ export const AnimatedInput: React.FC<AnimatedInputProps> = ({
               style={[
                 styles.input,
                 { 
-                  paddingLeft: Icon ? 40 : 16, 
-                  paddingRight: props.rightIcon ? 44 : 16, 
                   color: tokens.textColor,
                   ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {})
                 } as any,
@@ -159,7 +148,7 @@ export const AnimatedInput: React.FC<AnimatedInputProps> = ({
               );
             })()}
           </View>
-        </BlurView>
+        </View>
       </Animated.View>
 
       {error && (
@@ -181,7 +170,6 @@ const styles = StyleSheet.create({
   },
   labelFloat: {
     fontSize: DesignSystem.typography.caption,
-    color: DesignSystem.colors.primary,
     fontWeight: '600',
   },
   labelDefault: {
@@ -191,7 +179,6 @@ const styles = StyleSheet.create({
   inputWrapper: {
     borderRadius: DesignSystem.radius.md,
     overflow: 'hidden',
-    ...DesignSystem.shadows.card,
   },
   blur: {
     width: '100%',
@@ -199,7 +186,7 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 16,
+    paddingVertical: 14,
     paddingHorizontal: 16,
     borderRadius: DesignSystem.radius.md,
     borderWidth: 1,
@@ -207,20 +194,15 @@ const styles = StyleSheet.create({
   defaultBorder: {
     borderColor: DesignSystem.colors.glassBorder,
   },
-  focusedBorder: {
-    borderColor: DesignSystem.colors.primary,
-  },
   errorBorder: {
     borderColor: DesignSystem.colors.error,
   },
   icon: {
-    position: 'absolute',
-    left: 12,
+    marginRight: 12,
   },
   rightIconContainer: {
-    position: 'absolute',
-    right: 12,
     padding: 4,
+    marginLeft: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },

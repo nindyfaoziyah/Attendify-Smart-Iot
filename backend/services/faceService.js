@@ -121,27 +121,18 @@ const calculateAverageEmbedding = (descriptors) => {
     return normalizeL2(avg);
 };
 
-/**
- * Compare an incoming face against registered faces
- * @param {Buffer} imageBuffer 
- * @param {Array} registeredProfiles Array of { user_id, embedding_data (JSON string) }
- * @returns {Object} matchResult
- */
 const recognizeFace = async (imageBuffer, registeredProfiles) => {
     if (!modelsLoaded) await init();
 
     const img = await loadImage(imageBuffer);
 
-    // Gunakan opsi toleransi yang lebih rendah untuk ESP32
-    const options = new faceapi.SsdMobilenetv1Options({ minConfidence: 0.15 });
-    const detection = await faceapi.detectSingleFace(img, options).withFaceLandmarks().withFaceDescriptor();
-    if (!detection) return { success: false, message: 'No face detected in the image' };
-
-    // Pengecekan Multiple Faces dimatikan agar bayangan di background tidak dianggap wajah palsu
-    // const allFaces = await faceapi.detectAllFaces(img, options);
-    // if (allFaces.length > 1) {
-    //     return { success: false, message: 'Multiple faces detected', spoof: true, type: 'MULTIPLE_FACES' };
-    // }
+    // Kembalikan minConfidence ke 0.45 agar AI tidak berhalusinasi menganggap bayangan/benda sebagai wajah (yang bikin ngaco)
+    const options = new faceapi.SsdMobilenetv1Options({ minConfidence: 0.45 });
+    const detections = await faceapi.detectAllFaces(img, options).withFaceLandmarks().withFaceDescriptors();
+    
+    if (!detections || detections.length === 0) {
+        return { success: false, message: 'No face detected in the image' };
+    }
 
     if (registeredProfiles.length === 0) {
         return { success: false, message: 'No registered face profiles found' };
@@ -167,20 +158,32 @@ const recognizeFace = async (imageBuffer, registeredProfiles) => {
         return { success: false, message: 'Invalid face profile data' };
     }
 
-    const normalizedQuery = normalizeL2(detection.descriptor);
-    // Tingkatkan distance menjadi 0.65 agar lebih longgar (burem/gelap tetap kedetect)
-    const faceMatcher = new faceapi.FaceMatcher(embeddingCache, 0.65);
-    const bestMatch = faceMatcher.findBestMatch(normalizedQuery);
+    // Set distance menjadi 0.50 (Ketatkan kembali agar tidak salah menebak orang lain)
+    const faceMatcher = new faceapi.FaceMatcher(embeddingCache, 0.50);
+    
+    let matchedFaces = [];
 
-    if (bestMatch.label === 'unknown') {
-        return { success: false, message: 'Face not recognized', confidence: 1 - bestMatch.distance, spoof: true, type: 'UNKNOWN_FACE' };
+    for (const detection of detections) {
+        const normalizedQuery = normalizeL2(detection.descriptor);
+        const bestMatch = faceMatcher.findBestMatch(normalizedQuery);
+
+        if (bestMatch.label !== 'unknown') {
+            matchedFaces.push({
+                user_id: parseInt(bestMatch.label),
+                distance: bestMatch.distance,
+                confidence: 1 - bestMatch.distance
+            });
+        }
+    }
+
+    if (matchedFaces.length === 0) {
+        return { success: false, message: 'Face(s) detected but none recognized', spoof: true, type: 'UNKNOWN_FACE' };
     }
 
     return {
         success: true,
-        user_id: parseInt(bestMatch.label),
-        distance: bestMatch.distance,
-        confidence: 1 - bestMatch.distance
+        message: `${matchedFaces.length} face(s) recognized`,
+        matches: matchedFaces
     };
 };
 

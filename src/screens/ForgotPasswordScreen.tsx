@@ -23,7 +23,8 @@ interface ForgotPasswordScreenProps {
 }
 
 export default function ForgotPasswordScreen({ navigation }: ForgotPasswordScreenProps) {
-  const { tokens, isLightTheme } = useTheme();
+  const { tokens, isLightTheme, themeColors } = useTheme();
+  const themePrimary = themeColors && themeColors.length > 0 ? themeColors[Math.min(1, themeColors.length - 1)] : DesignSystem.colors.primary;
   const [email, setEmail] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
@@ -163,8 +164,8 @@ export default function ForgotPasswordScreen({ navigation }: ForgotPasswordScree
                 activeOpacity={0.7}
               >
                 <View style={styles.backToLoginLinkContainer}>
-                  <Text style={[styles.backToLoginLink, { color: isLightTheme ? '#1E4FA8' : DesignSystem.colors.secondary }]}>Kembali ke login</Text>
-                  <ArrowRight size={12} color={isLightTheme ? '#1E4FA8' : DesignSystem.colors.secondary} />
+                  <Text style={[styles.backToLoginLink, { color: themePrimary }]}>Kembali ke login</Text>
+                  <ArrowRight size={12} color={themePrimary} />
                 </View>
               </TouchableOpacity>
             </View>

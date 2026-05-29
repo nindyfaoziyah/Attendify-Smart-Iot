@@ -28,7 +28,26 @@ interface LoginScreenProps {
 
 export default function LoginScreen({ navigation }: LoginScreenProps) {
   const { login } = useAuth();
-  const { tokens, isLightTheme } = useTheme();
+  const { tokens, isLightTheme, themeColors } = useTheme();
+  
+  const themePrimary = themeColors && themeColors.length > 0 ? themeColors[Math.min(1, themeColors.length - 1)] : DesignSystem.colors.primary;
+  
+  const hexToRgba = (hex: string, alpha: number) => {
+    let r = 0, g = 0, b = 0;
+    if (hex && hex.startsWith('#')) {
+      if (hex.length === 4) {
+        r = parseInt(hex[1] + hex[1], 16);
+        g = parseInt(hex[2] + hex[2], 16);
+        b = parseInt(hex[3] + hex[3], 16);
+      } else if (hex.length === 7) {
+        r = parseInt(hex.slice(1, 3), 16);
+        g = parseInt(hex.slice(3, 5), 16);
+        b = parseInt(hex.slice(5, 7), 16);
+      }
+    }
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  };
+
   const [role, setRole] = useState<'mahasiswa' | 'dosen' | 'admin'>('mahasiswa');
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
@@ -180,13 +199,13 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
             {/* Role Selector - Modern Tabs */}
             <View style={styles.roleSection}>
             
-              <View style={[styles.roleContainer, { backgroundColor: isLightTheme ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)' }]}>
+              <View style={[styles.roleContainer, { backgroundColor: isLightTheme ? 'rgba(0,0,0,0.05)' : tokens.inputBg }]}>
                 {(['mahasiswa', 'dosen', 'admin'] as const).map((r) => (
                   <TouchableOpacity
                     key={r}
                     style={[
                       styles.roleTab,
-                      role === r && (isLightTheme ? { backgroundColor: 'rgba(30, 79, 168, 0.1)' } : styles.roleTabActive),
+                      role === r && (isLightTheme ? { backgroundColor: hexToRgba(themePrimary, 0.1) } : { backgroundColor: themePrimary }),
                     ]}
                     onPress={() => setRole(r)}
                     activeOpacity={0.8}
@@ -194,11 +213,11 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
                     <Animated.View 
                       entering={role === r ? ZoomIn.springify() : undefined}
                     >
-                      {r === 'mahasiswa' && <Users size={18} color={role === r ? (isLightTheme ? '#1E4FA8' : '#FFF') : tokens.subTextColor} />}
-                      {r === 'dosen' && <User size={18} color={role === r ? (isLightTheme ? '#1E4FA8' : '#FFF') : tokens.subTextColor} />}
-                      {r === 'admin' && <ShieldCheck size={18} color={role === r ? (isLightTheme ? '#1E4FA8' : '#FFF') : tokens.subTextColor} />}
+                      {r === 'mahasiswa' && <Users size={16} color={role === r ? (isLightTheme ? themePrimary : '#FFF') : tokens.subTextColor} />}
+                      {r === 'dosen' && <User size={16} color={role === r ? (isLightTheme ? themePrimary : '#FFF') : tokens.subTextColor} />}
+                      {r === 'admin' && <ShieldCheck size={16} color={role === r ? (isLightTheme ? themePrimary : '#FFF') : tokens.subTextColor} />}
                     </Animated.View>
-                    <Text style={[styles.roleTabText, { color: tokens.subTextColor }, role === r && { color: isLightTheme ? '#1E4FA8' : '#FFF', fontWeight: '700' }]}>
+                    <Text style={[styles.roleTabText, { color: tokens.subTextColor }, role === r && { color: isLightTheme ? themePrimary : '#FFF', fontWeight: '700' }]}>
                       {r === 'mahasiswa' ? 'Mahasiswa' : r === 'dosen' ? 'Dosen' : 'Admin'}
                     </Text>
                   </TouchableOpacity>
@@ -208,7 +227,6 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
 
             {/* Form Inputs */}
             <View style={styles.formSection}>
-              <Text style={[styles.sectionTitle, { color: tokens.textColor }]}>Login</Text>
               
               <AnimatedInput
                 icon={Mail}
@@ -241,7 +259,7 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
                 onPress={() => setRememberMe(!rememberMe)}
                 activeOpacity={0.7}
               >
-                <View style={[styles.checkbox, { borderColor: isLightTheme ? '#1E4FA8' : 'rgba(255,255,255,0.3)' }, rememberMe && { backgroundColor: isLightTheme ? '#1E4FA8' : DesignSystem.colors.primary, borderColor: isLightTheme ? '#1E4FA8' : DesignSystem.colors.primary }]}>
+                <View style={[styles.checkbox, { borderColor: isLightTheme ? themePrimary : 'rgba(255,255,255,0.3)' }, rememberMe && { backgroundColor: themePrimary, borderColor: themePrimary }]}>
                   {rememberMe && <Text style={styles.checkboxTick}>✓</Text>}
                 </View>
                 <Text style={[styles.rememberText, { color: tokens.subTextColor }]}>Ingat saya</Text>
@@ -251,7 +269,7 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
                 onPress={() => navigation?.navigate('ForgotPassword')}
                 activeOpacity={0.7}
               >
-                <Text style={[styles.forgotPasswordText, { color: isLightTheme ? '#1E4FA8' : DesignSystem.colors.primary }]}>Lupa password?</Text>
+                <Text style={[styles.forgotPasswordText, { color: isLightTheme ? themePrimary : '#60A5FA' }]}>Lupa password?</Text>
               </TouchableOpacity>
             </View>
 
@@ -283,8 +301,7 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
                 activeOpacity={0.7}
               >
                 <View style={styles.signupLinkContainer}>
-                  <Text style={[styles.signupLink, { color: isLightTheme ? '#1E4FA8' : DesignSystem.colors.secondary }]}>Daftar Sekarang</Text>
-                  <ArrowRight size={14} color={isLightTheme ? '#1E4FA8' : DesignSystem.colors.secondary} />
+                  <Text style={[styles.signupLink, { color: isLightTheme ? themePrimary : '#60A5FA' }]}>Daftar Sekarang</Text>
                 </View>
               </TouchableOpacity>
             </View>
@@ -296,7 +313,7 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
           entering={FadeInUp.delay(600)}
           style={styles.footerInfo}
         >
-          <Text style={[styles.footerText, { color: tokens.labelColor }]}>© 2024 Attendify. Semua hak dilindungi.</Text>
+          <Text style={[styles.footerText, { color: tokens.labelColor }]}>© 2026 Attendify. Semua hak dilindungi.</Text>
         </Animated.View>
 
       </ScrollView>
@@ -408,7 +425,7 @@ const styles = StyleSheet.create({
   },
   roleContainer: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 4,
     backgroundColor: DesignSystem.colors.surfaceVariant,
     borderRadius: DesignSystem.radius.md,
     padding: 4,
@@ -416,12 +433,12 @@ const styles = StyleSheet.create({
   roleTab: {
     flex: 1,
     flexDirection: 'row',
-    paddingVertical: 12,
-    paddingHorizontal: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 2,
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: DesignSystem.radius.sm,
-    gap: 6,
+    gap: 4,
   },
   roleTabActive: {
     backgroundColor: DesignSystem.colors.primary,
@@ -429,7 +446,7 @@ const styles = StyleSheet.create({
   roleTabText: {
     color: 'rgba(255,255,255,0.5)',
     fontWeight: '600',
-    fontSize: 12,
+    fontSize: 11,
   },
   roleTabTextActive: {
     color: '#FFF',
@@ -506,7 +523,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingVertical: 4,
   },
   signupLink: {
     color: DesignSystem.colors.secondary,

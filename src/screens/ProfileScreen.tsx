@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Platform, Modal, Image, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
+// import { BlurView } from 'expo-blur';
 import { Colors } from '@/constants/Colors';
 import { User, Settings, LogOut, ChevronRight, BookOpen, GraduationCap, Phone, Mail, Shield, Edit3, IdCard } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -82,7 +82,7 @@ export default function ProfileScreen() {
 
           <Text style={[styles.name, { color: tokens.textColor }]}>{userName}</Text>
 
-          <View style={[styles.roleBadge, { backgroundColor: isLightTheme ? 'rgba(59,130,246,0.1)' : 'rgba(255,255,255,0.15)', borderWidth: 1, borderColor: isLightTheme ? 'rgba(59,130,246,0.2)' : 'rgba(255,255,255,0.15)' }]}>
+          <View style={[styles.roleBadge, { backgroundColor: isLightTheme ? 'rgba(59,130,246,0.1)' : 'rgba(255,255,255,0.15)' }]}>
             <Text style={[styles.role, { color: isLightTheme ? '#2563eb' : '#E2E8F0' }]}>
               {roleLabel}{userProdi && role !== 'admin' ? ` - ${userProdi}` : ''}
             </Text>
@@ -93,7 +93,7 @@ export default function ProfileScreen() {
 
           {/* ── CARD 1: Identitas ── */}
           <Text style={[styles.cardTitle, { color: tokens.labelColor }]}>Identitas Akun</Text>
-          <BlurView intensity={20} tint={isLightTheme ? 'light' : 'dark'} style={[styles.card, { borderColor: tokens.borderColor }]}>
+          <View style={[styles.card, { backgroundColor: tokens.cardBg, borderColor: isLightTheme ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.15)' }]}>
             <View style={styles.menuItem}>
               <View style={styles.menuItemLeft}>
                 <View style={[styles.iconBox, { backgroundColor: 'rgba(59,130,246,0.15)' }]}>
@@ -121,13 +121,13 @@ export default function ProfileScreen() {
                 </View>
               </View>
             </View>
-          </BlurView>
+          </View>
 
           {/* ── CARD 2: Detail Informasi ── */}
           <Text style={[styles.cardTitle, { color: tokens.labelColor }]}>
             {role === 'mahasiswa' ? 'Data Akademik' : 'Informasi Kontak'}
           </Text>
-          <BlurView intensity={20} tint={isLightTheme ? 'light' : 'dark'} style={[styles.card, { borderColor: tokens.borderColor }]}>
+          <View style={[styles.card, { backgroundColor: tokens.cardBg, borderColor: isLightTheme ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.15)' }]}>
             {role === 'mahasiswa' ? (
               <>
                 <View style={styles.menuItem}>
@@ -179,11 +179,11 @@ export default function ProfileScreen() {
                 </View>
               </>
             )}
-          </BlurView>
+          </View>
 
           {/* ── CARD 3: Pengaturan & Aksi ── */}
           <Text style={[styles.cardTitle, { color: tokens.labelColor }]}>Pengaturan & Akun</Text>
-          <BlurView intensity={20} tint={isLightTheme ? 'light' : 'dark'} style={[styles.card, { borderColor: tokens.borderColor }]}>
+          <View style={[styles.card, { backgroundColor: tokens.cardBg, borderColor: isLightTheme ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.15)' }]}>
             <TouchableOpacity 
               style={styles.menuItem}
               onPress={() => navigation.navigate('ProfileDetails')}
@@ -211,14 +211,14 @@ export default function ProfileScreen() {
               </View>
               <ChevronRight size={20} color={tokens.subTextColor} />
             </TouchableOpacity>
-          </BlurView>
+          </View>
         </View>
 
         {/* Logout Button */}
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.85}>
-          <LinearGradient colors={['#dc2626', '#b91c1c']} style={styles.logoutGradient}>
-            <LogOut size={20} color="#fff" />
-            <Text style={styles.logoutText}>Logout dari Akun</Text>
+          <LinearGradient colors={['#EF4444', '#DC2626']} style={[styles.logoutGradient, { borderRadius: 18 }]}>
+            <LogOut size={20} color="#ffffff" />
+            <Text style={[styles.logoutText, { color: '#ffffff' }]}>Logout dari Akun</Text>
           </LinearGradient>
         </TouchableOpacity>
 
@@ -232,7 +232,7 @@ export default function ProfileScreen() {
         onRequestClose={() => setShowLogoutModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <BlurView intensity={40} tint={isLightTheme ? 'light' : 'dark'} style={[styles.modalContainer, { backgroundColor: tokens.cardBg, borderColor: tokens.borderColor, borderWidth: 1 }]}>
+          <View style={[styles.modalContainer, { backgroundColor: isLightTheme ? '#FFFFFF' : '#1E293B', borderColor: tokens.borderColor, borderWidth: 1 }]}>
             <View style={[styles.modalIconContainer, { backgroundColor: 'rgba(239, 68, 68, 0.15)' }]}>
               <LogOut size={32} color="#EF4444" />
             </View>
@@ -255,7 +255,7 @@ export default function ProfileScreen() {
                 <Text style={styles.modalBtnLogoutText}>Logout</Text>
               </TouchableOpacity>
             </View>
-          </BlurView>
+          </View>
         </View>
       </Modal>
 
@@ -267,7 +267,7 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
 
   scrollContent: {
-    paddingTop: Platform.OS === 'web' ? 40 : 80,
+    paddingTop: Platform.OS === 'web' ? 40 : 50,
     paddingHorizontal: 20,
     paddingBottom: 100,
   },

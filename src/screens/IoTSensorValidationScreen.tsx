@@ -206,9 +206,9 @@ export default function IoTSensorValidationScreen({ isEmbedded = false }: { isEm
   };
 
   const LogItem = ({ item }: any) => (
-    <BlurView intensity={15} tint="dark" style={styles.logCard}>
+    <View style={[styles.logCard, { backgroundColor: '#1E293B', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }]}>
       {/* ... previous log item UI ... */}
-    </BlurView>
+    </View>
   );
 
   const BackgroundComponent = isEmbedded ? View : AnimatedBackground;
@@ -238,7 +238,7 @@ export default function IoTSensorValidationScreen({ isEmbedded = false }: { isEm
 
         <ScrollView contentContainerStyle={[styles.scrollContent, isEmbedded && { paddingTop: 20 }]} showsVerticalScrollIndicator={false}>
           <View style={styles.deviceGrid}>
-            <BlurView intensity={20} tint={isLightTheme ? 'light' : 'dark'} style={[styles.deviceCard, { backgroundColor: tokens.cardBg, borderColor: tokens.borderColor }]}>
+            <View style={[styles.deviceCard, { backgroundColor: isLightTheme ? '#F8FAFC' : '#1E293B', borderColor: tokens.borderColor }]}>
               <Cpu size={24} color={Colors.ai.primary} />
               <View style={styles.deviceDetails}>
                 <Text style={[styles.deviceTitle, { color: tokens.textColor }]}>ESP32-Cam-01</Text>
@@ -247,10 +247,10 @@ export default function IoTSensorValidationScreen({ isEmbedded = false }: { isEm
                   <Text style={styles.statusOnline}>Online</Text>
                 </View>
               </View>
-            </BlurView>
+            </View>
           </View>
 
-          <BlurView intensity={30} tint={isLightTheme ? 'light' : 'dark'} style={[styles.warningBanner, { backgroundColor: tokens.cardBg, borderColor: tokens.borderColor }]}>
+          <View style={[styles.warningBanner, { backgroundColor: isLightTheme ? '#DBEAFE' : '#1E293B', borderColor: 'rgba(59,130,246,0.3)' }]}>
             <LinearGradient
               colors={isLightTheme ? ['rgba(59,130,246,0.05)', 'rgba(59,130,246,0.02)'] : ['rgba(59,130,246,0.1)', 'rgba(59,130,246,0.05)']}
               style={styles.warningGradient}
@@ -261,11 +261,11 @@ export default function IoTSensorValidationScreen({ isEmbedded = false }: { isEm
                 <Text style={[styles.warningDesc, { color: tokens.subTextColor }]}>Gunakan ESP32-CAM untuk mengambil data wajah mahasiswa baru untuk autentikasi sistem.</Text>
               </View>
             </LinearGradient>
-            <TouchableOpacity style={[styles.validateLink, { borderTopColor: tokens.borderColor }]} onPress={() => setIsModalVisible(true)}>
-              <Text style={styles.validateLinkText}>Mulai Validasi Sensor</Text>
-              <ShieldCheck size={16} color={Colors.ai.primary} />
+            <TouchableOpacity style={[styles.validateLink, { backgroundColor: '#3B82F6', borderTopWidth: 0 }]} onPress={() => setIsModalVisible(true)}>
+              <Text style={[styles.validateLinkText, { color: '#FFF' }]}>Mulai Validasi Sensor</Text>
+              <ShieldCheck size={16} color="#FFF" />
             </TouchableOpacity>
-          </BlurView>
+          </View>
 
           <Text style={[styles.sectionTitle, { color: tokens.textColor }]}>Log Deteksi Sistem</Text>
           <View style={[styles.emptyLogs, { backgroundColor: tokens.inputBg, borderColor: tokens.borderColor }]}>
@@ -279,7 +279,7 @@ export default function IoTSensorValidationScreen({ isEmbedded = false }: { isEm
       {/* IoT Validation Modal */}
       <Modal visible={isModalVisible} animationType="slide" transparent={true}>
         <View style={styles.modalOverlay}>
-          <BlurView intensity={80} tint={isLightTheme ? 'light' : 'dark'} style={[styles.modalContent, { backgroundColor: tokens.cardBg, borderColor: tokens.borderColor }]}>
+          <View style={[styles.modalContent, { backgroundColor: isLightTheme ? '#FFFFFF' : '#161D31', borderColor: tokens.borderColor }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: tokens.textColor }]}>ESP32-CAM Validation</Text>
               <TouchableOpacity onPress={closeModal}>
@@ -443,7 +443,7 @@ export default function IoTSensorValidationScreen({ isEmbedded = false }: { isEm
                   </View>
               </View>
             )}
-          </BlurView>
+          </View>
         </View>
       </Modal>
     </View>
@@ -540,8 +540,6 @@ const styles = StyleSheet.create({
   warningBanner: {
     borderRadius: 24,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(59,130,246,0.2)',
     marginBottom: 32,
   },
   warningGradient: {

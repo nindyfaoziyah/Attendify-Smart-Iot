@@ -58,10 +58,11 @@ exports.scanWajah = async (req, res) => {
             [user_id_val, activeJadwalId, statusAbsen]
         );
 
-        // Notikasi
+        // Notifications (using the unified `notifications` table)
         await db.query(
-            'INSERT INTO notifikasi (user_id, judul, pesan, jenis_notif, tanggal, status_baca) VALUES (?, ?, ?, ?, NOW(), ?)',
-            [user_id_val, 'Informasi Absensi', `Absensi berhasil: ${statusAbsen === 'hadir' ? 'Hadir tepat waktu ✅' : 'Anda terlambat ⚠️'}`, 'absensi', 'belum']
+            `INSERT INTO notifications (receiver_user_id, sender_user_id, type, title, message, is_read)
+             VALUES (?, NULL, 'ATTENDANCE_SUCCESS', 'Absensi Berhasil', ?, FALSE)`,
+            [user_id_val, `${statusAbsen === 'hadir' ? 'Hadir' : 'Terlambat'} — Kehadiranmu pukul ${new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} berhasil dicatat via scan wajah manual.`]
         );
 
         res.json({
@@ -155,6 +156,58 @@ exports.getAbsensiByMahasiswa = async (req, res) => {
             ORDER BY a.tanggal DESC
         `, [user_id]);
         res.json({ status: 'success', data: absensi });
+    } catch (err) {
+        res.status(500).json({ status: 'error', message: err.message });
+    }
+};
+
+exports.getDashboardStats = async (req, res) => {
+    try {
+        const { user_id } = req.params;
+
+        // 1. Cek apakah sudah absen hari ini
+        const [todayScan] = await db.query(`
+            SELECT id_absensi 
+            FROM absensi 
+            WHERE user_id = ? AND DATE(tanggal) = CURDATE()
+            LIMIT 1
+        `, [user_id]);
+
+        // 2. Statistik per mata kuliah berdasarkan kelas mahasiswa
+        const [stats] = await db.query(`
+            SELECT 
+                mk.nama_mk AS subject,
+                (
+                    SELECT COUNT(*) 
+                    FROM absensi a 
+                    WHERE a.user_id = ? AND a.jadwal_id = jk.id_jadwal AND a.status != 'alfa'
+                ) AS attended,
+                (
+                    SELECT COUNT(DISTINCT DATE(ab.tanggal))
+                    FROM absensi ab
+                    WHERE ab.jadwal_id = jk.id_jadwal
+                ) AS total
+            FROM jadwal_kuliah jk
+            JOIN mata_kuliah mk ON jk.mata_kuliah_id = mk.id_mk
+            JOIN mahasiswa_kelas mak ON mak.kelas_id = jk.kelas_id
+            WHERE mak.mahasiswa_id = ?
+        `, [user_id, user_id]);
+
+        res.json({
+            status: 'success',
+            data: {
+                alreadyScannedToday: todayScan.length > 0,
+                stats: stats.map(s => {
+                    const total = s.total > 0 ? s.total : 1; // Prevent division by zero
+                    return {
+                        subject: s.subject,
+                        attended: s.attended,
+                        total: total,
+                        attendance: Math.round((s.attended / total) * 100)
+                    };
+                })
+            }
+        });
     } catch (err) {
         res.status(500).json({ status: 'error', message: err.message });
     }
